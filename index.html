@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deal Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<script>
+  (function(){ try { var t = localStorage.getItem('da-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script>
+<style>
+  :root{
+    --ink:#17324D; --paper:#F5F6F8; --panel:#FFFFFF; --line:#D5D9E0; --slate:#5B6B7C;
+    --brick:#A63D2F; --brick-soft:#F5E3E0; --green:#2F6B4F; --green-soft:#E1EFE7; --focus:#C8962E;
+    --sans:"Public Sans", Arial, sans-serif; --serif:"Source Serif 4", Georgia, serif;
+  }
+  /* Theme: follows the device until the investor picks one with the toggle */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --ink:#E6ECF2; --paper:#0F1B27; --panel:#172636; --line:#2A3C50; --slate:#9AAABB;
+      --brick:#E07A6B; --brick-soft:#3A2220; --green:#7CC4A0; --green-soft:#193328; color-scheme:dark; }
+  }
+  :root[data-theme="dark"]{ --ink:#E6ECF2; --paper:#0F1B27; --panel:#172636; --line:#2A3C50; --slate:#9AAABB;
+      --brick:#E07A6B; --brick-soft:#3A2220; --green:#7CC4A0; --green-soft:#193328; color-scheme:dark; }
+  :root[data-theme="light"]{ color-scheme:light; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+  a{color:inherit}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
+  header.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  header.top h1{font-family:var(--serif);font-size:26px;margin:0}
+  header.top p{margin:0;color:var(--slate);font-size:14px}
+  .top-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .theme-toggle{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:999px;
+    border:1.5px solid var(--line);background:var(--panel);color:var(--ink);font:600 13px var(--sans);cursor:pointer}
+  .theme-toggle:hover{border-color:var(--ink)}
+  .theme-toggle svg{width:16px;height:16px}
+
+  /* Gate */
+  .gate{max-width:460px;margin:8vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .gate h2{font-family:var(--serif);font-size:28px;line-height:1.15;margin:0 0 8px}
+  .gate p{color:var(--slate);margin:0 0 18px}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+  .field label{font-size:13px;font-weight:600}
+  input[type=text],input[type=email],input[type=tel],input[type=number],select{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+  .consent{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--slate);margin:6px 0 16px}
+  .btn{border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--ink);color:var(--paper)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .err{color:var(--brick);font-size:13px;min-height:18px}
+
+  /* App layout */
+  .grid{display:grid;grid-template-columns:400px 1fr;gap:22px;align-items:start}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  .grid>*,.rows>*,.fin>*{min-width:0}
+  .fin input,.rows input,.rows select{min-width:0;width:100%}
+  .inputs{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 16px 16px}
+  details{border-bottom:1px solid var(--line);padding:10px 0}
+  details:last-of-type{border-bottom:0}
+  summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between}
+  summary::after{content:"+";color:var(--slate)} details[open] summary::after{content:"−"}
+  .rows{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px}
+  .rows .full{grid-column:1/-1}
+  .rows label{font-size:12px;color:var(--slate);display:block}
+  .lbl{display:flex;align-items:center;min-height:20px;margin-bottom:3px}
+  .lbl label{margin:0}
+  .hudbox{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 10px 4px}
+  .hudrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+  .hudrow .inline-btn{margin:0;white-space:nowrap;height:100%}
+  .hudbox .note{margin-top:6px}
+  .ugrid{grid-column:1/-1;display:grid;grid-template-columns:30px 92px minmax(0,1fr);gap:6px 8px;align-items:center}
+  .ugrid.on{grid-template-columns:30px 88px minmax(0,1fr) minmax(0,1fr)}
+  .ugrid .uh{font-size:12px;color:var(--slate);display:flex;align-items:center;min-height:20px}
+  .ugrid .un{font-weight:700;font-size:14px;text-align:center;color:var(--slate)}
+  .ugrid select,.ugrid input{min-width:0;width:100%}
+  .ugrid .un.own{color:#C8962E}
+  .ugrid .unit.own input{opacity:.6}
+  .taxwarn{border-left:3px solid #C8962E;background:rgba(200,150,46,.12);color:var(--ink);padding:7px 10px;border-radius:6px;margin:4px 0 6px;font-size:12.5px;line-height:1.45}
+  #assessed.needs{border-color:#C8962E;box-shadow:0 0 0 2px rgba(200,150,46,.25)}
+  .ownnote{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:var(--slate);border-left:3px solid #C8962E;padding:3px 9px;margin:-2px 0 4px}
+  .ownnote b{color:var(--ink)}
+  .ugrid .unit input{padding-right:20px;padding-left:8px}
+  .ugrid .unit span{right:7px}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield;appearance:textfield}
+  @media (max-width:480px){
+    .ugrid,.ugrid.on{grid-template-columns:18px 74px minmax(0,1fr)}
+    .ugrid.on{grid-template-columns:18px 70px minmax(0,1fr) minmax(0,1fr)}
+    .ugrid select{padding-left:6px;padding-right:4px}
+  }
+  .unit{position:relative}
+  .unit span{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--slate);font-size:12px;pointer-events:none}
+  .unit input{padding-right:30px}
+  .fin{display:grid;grid-template-columns:86px repeat(3,1fr);gap:6px 8px;margin-top:10px;font-size:13px;align-items:center}
+  .fin .h{font-weight:700;font-size:12px}
+  .fin input{padding:6px 8px}
+  .fin .auto{font-size:13px;color:var(--slate);padding:6px 2px}
+  .hint{font-size:12px;color:var(--slate);margin:8px 0 0}
+
+  /* Results */
+  .verdict{font-family:var(--serif);font-size:clamp(22px,3vw,30px);line-height:1.2;margin:0 0 14px;max-width:34ch}
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  @media (max-width:640px){ .strip{grid-template-columns:1fr} }
+  .loan{padding:16px 18px;border-right:1px solid var(--line)}
+  .loan:last-child{border-right:0}
+  @media (max-width:640px){ .loan{border-right:0;border-bottom:1px solid var(--line)} .loan:last-child{border-bottom:0} }
+  .loan h3{margin:0;font-size:15px}
+  .loan .sub{color:var(--slate);font-size:12px;margin-bottom:10px}
+  .big{font-family:var(--serif);font-size:34px;font-weight:700;line-height:1}
+  .big.neg{color:var(--brick)} .big.pos{color:var(--green)}
+  .cap{font-size:12px;color:var(--slate);margin:4px 0 10px}
+  .badge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px}
+  .badge.ok{background:var(--green-soft);color:var(--green)} .badge.no{background:var(--brick-soft);color:var(--brick)}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px dashed var(--line)}
+  .piti{display:flex;justify-content:space-between;align-items:baseline;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 6px}
+  .piti span{font-size:13px;font-weight:600}
+  .piti b{font-family:var(--serif);font-size:20px}
+  .piti-sub{font-size:11.5px;color:var(--slate);margin:0 0 10px;line-height:1.35}
+  .kv:first-of-type{border-top:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:16px}
+  .panel h4{margin:0 0 10px;font-size:15px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+  .stat b{display:block;font-family:var(--serif);font-size:22px}
+  .stat span{font-size:12px;color:var(--slate)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--slate);font-weight:600}
+  .scroll{overflow-x:auto}
+  .neg{color:var(--brick)} .pos{color:var(--green)}
+  .leftcol{align-self:stretch;display:flex;flex-direction:column;gap:14px;min-width:0}
+  .actions{position:sticky;top:16px;display:grid;grid-template-columns:1fr;gap:10px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .actions .btn,.actions select{width:100%;height:46px;margin:0;box-sizing:border-box;border-radius:8px;
+    font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .actions select{border:1.5px solid var(--ink);background-color:var(--panel);color:var(--ink);text-align:center;text-align-last:center;cursor:pointer;
+    -webkit-appearance:none;-moz-appearance:none;appearance:none;padding:0 44px}
+  .selwrap{position:relative}
+  #sensTbl th,#buyTbl th{white-space:normal;vertical-align:bottom;line-height:1.25}
+  #sensTbl th:nth-child(5){min-width:84px}
+  .thsub{display:block;font-size:10.5px;font-weight:500;color:var(--slate);text-transform:none;letter-spacing:0}
+  #cmp tr.grp td{font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--slate);
+    padding:14px 8px 6px;border-bottom:1px solid var(--line);background:transparent}
+  #cmp tbody tr.grp:first-child td{padding-top:6px}
+  /* Highlighted max-price rows in the side-by-side table */
+  #cmp tr.hl td{background:rgba(200,150,46,.12);border-top:1px solid rgba(200,150,46,.45);border-bottom:1px solid rgba(200,150,46,.45)}
+  #cmp tr.hl td:first-child{box-shadow:inset 4px 0 0 #C8962E;font-weight:700;white-space:normal;min-width:170px;max-width:210px}
+  #cmp tr.hl td{white-space:normal}
+  #cmp tr.hl .tgt{font-weight:400;color:var(--slate);font-size:12px}
+  #cmp .maxv{display:block;font-size:16px}
+  #cmp .maxd{display:block;font-size:11px;font-weight:600;margin-top:1px}
+  #cmp .maxcap{display:block;font-size:10.5px;color:var(--slate);margin-top:1px}
+  #cmp .maxnote{font-size:12.5px;color:var(--slate);font-style:italic}
+  /* Dropdown lists: explicit colors so options stay readable in light and dark mode */
+  select{background-color:var(--paper);color:var(--ink)}
+  .actions select{background-color:var(--panel)}
+  select option,select optgroup{background-color:var(--panel);color:var(--ink);font-weight:500;text-align:left}
+  select option:checked{background-color:var(--line);color:var(--ink)}
+  select option[value=""]{color:var(--slate)}
+  .selwrap::after{content:"";position:absolute;right:22px;top:50%;width:8px;height:8px;pointer-events:none;
+    border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-70%) rotate(45deg)}
+  .actions .hint{margin:2px 0 0}
+  @media (max-width:900px){ .actions{position:static} }
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+    padding:10px 16px;border-radius:10px;font-size:14px;display:none;max-width:92vw;z-index:9}
+  .actions a.btn{text-decoration:none}
+  .toast.err{background:var(--brick);color:#fff}
+  footer{margin-top:28px;font-size:12px;color:var(--slate)}
+  .hidden{display:none}
+  .inline-btn{margin-top:6px;border:1.5px solid var(--ink);background:transparent;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:13px}
+  .note{grid-column:1/-1;font-size:12px;color:var(--slate);margin:2px 0 0}
+  .note table{font-size:12px;margin-top:6px}
+  .note table.hud{width:100%;margin:8px 0}
+  .note table.hud th,.note table.hud td{padding:5px 6px;white-space:normal}
+  .note table.hud th{font-size:11px;line-height:1.2}
+  .note table.hud td:first-child{font-weight:600;color:var(--ink)}
+  .seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;margin-bottom:10px}
+  .seg button{border:0;background:transparent;padding:6px 12px;font-weight:700;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .tools-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+  .tools-head label{font-size:12px;color:var(--slate);display:flex;gap:6px;align-items:center}
+  .tools-head input{width:70px;padding:5px 8px}
+  .panel h5{margin:14px 0 6px;font-size:13px}
+  .picks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;font-size:13px}
+  .picks label{display:flex;gap:6px;align-items:center}
+  .term{border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:help;
+    text-decoration:underline dotted;text-decoration-color:var(--slate);text-decoration-thickness:1.5px;text-underline-offset:3px}
+  .term:hover,.term[aria-expanded="true"]{text-decoration-style:solid;text-decoration-color:currentColor}
+  .badge .term{text-decoration-color:currentColor}
+  .req{font-weight:400;color:var(--slate)}
+  input.invalid{border-color:var(--brick)!important;box-shadow:0 0 0 2px var(--brick-soft)}
+  .fielderr{color:var(--brick);font-size:12px;margin:5px 0 0;font-weight:600}
+  .fielderr:empty{display:none}
+  .inputs textarea{width:100%;min-height:120px;resize:vertical;padding:9px 10px;border:1px solid var(--line);border-radius:8px;
+    background:var(--paper);color:var(--ink);font:14px/1.45 var(--sans)}
+  .charcount{font-size:11px;color:var(--slate);text-align:right;margin-top:3px}
+  .tiphint{font-size:12px;color:var(--slate);margin:10px 0 2px}
+  #tipBox{position:absolute;z-index:20;max-width:280px;background:var(--ink);color:var(--paper);font-size:13px;line-height:1.45;
+    padding:10px 12px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+  #tipBox b{display:block;margin-bottom:2px;font-size:13px}
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Deal Analyzer</h1>
+    <div class="top-right">
+      <p>Built by Lans Powell Jr, Poised Investments</p>
+      <button type="button" class="theme-toggle" id="themeBtn" aria-live="polite"></button>
+    </div>
+  </header>
+
+  <!-- App -->
+  <section id="app" class="hidden">
+    <div class="grid">
+      <div class="leftcol">
+        <form class="inputs" id="form" autocomplete="off" aria-label="Deal inputs"></form>
+        <datalist id="townList"></datalist>
+        <div class="actions" role="group" aria-label="Save and compare">
+          <button class="btn" id="saveBtn" type="button">Save deal</button>
+          <button class="btn ghost" id="pdfBtn" type="button">Print / save PDF</button>
+          <button class="btn ghost" id="cheatBtn" type="button">Client cheat sheet (print / PDF)</button>
+          <div class="selwrap"><select id="loadSel" aria-label="Load a saved deal"><option value="">Load a saved deal…</option></select></div>
+          <button class="btn ghost" id="cmpBtn" type="button">Compare saved deals</button>
+          <a class="btn ghost" id="fbBtn" href="#" target="_blank" rel="noopener">Send feedback</a>
+          <p class="hint">Saved deals stay in this browser on this device. Estimates for screening only. Loan rules, limits and rates change; confirm with a lender. Not financial or lending advice.</p>
+        </div>
+      </div>
+      <div>
+        <p class="verdict" id="verdict" aria-live="polite"></p>
+        <div class="strip" id="strip"></div>
+        <div class="panel"><h4>Property</h4><div class="stats" id="propStats"></div></div>
+        <div class="panel"><h4>Side by side</h4><div class="scroll"><table id="cmp"></table></div><button class="inline-btn" id="cmpMore" type="button" aria-expanded="false" aria-controls="cmp" style="margin-top:12px"></button></div>
+        <div class="panel"><h4>BRRRR (buy, rehab, rent, refinance)</h4><div class="stats" id="brrrr"></div>
+          <p class="hint" id="brrrrNote"></p></div>
+        <div class="panel" id="toolsPanel">
+          <div class="tools-head"><h4 style="margin:0">Rate buydown & price sensitivity</h4>
+            <label>Rate drop per point <input id="step" type="number" step="0.05" value="0.25">%</label></div>
+          <div class="seg" role="group" aria-label="Loan" id="toolSeg" style="margin-top:10px">
+            <button type="button" data-k="fha" aria-pressed="true">FHA</button><button type="button" data-k="conv" aria-pressed="false">Conventional</button><button type="button" data-k="dscr" aria-pressed="false">DSCR</button></div>
+          <h5 id="h5buy">Rate buydown</h5><div class="scroll"><table id="buyTbl"></table></div>
+          <h5 id="h5sens">If the price were…</h5><div class="scroll"><table id="sensTbl"></table><p class="hint" id="sensNote"></p></div>
+        </div>
+        <div class="panel hidden" id="cmpPanel"><h4>Compare saved deals</h4>
+          <div class="picks" id="picks"></div><div class="scroll"><table id="dealTbl"></table></div>
+          <p class="hint">Pick up to 4. Saved deals are recalculated with today's formulas.</p></div>
+      </div>
+    </div>
+    <footer>Questions about a deal? Contact Lans Powell Jr, Poised Investments: <a href="mailto:lanspowelljr@gmail.com">lanspowelljr@gmail.com</a></footer>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<div id="tipBox" role="tooltip" hidden></div>
+
+<script>
+const BRAND = { name: 'Lans Powell Jr', company: 'Poised Investments', email: 'lanspowelljr@gmail.com' };
+
+/* ---------------- Settings for the GitHub version ---------------- */
+// Apps Script "Data service" deployment (Execute as: Me | Who has access: Anyone). Serves HUD rents and tax rates.
+const DATA_URL = 'https://script.google.com/macros/s/AKfycbxC7U9HQGoXF9yd7jGcBawDCnJkanYEPWR5eNeN7f5lT1BXfnTFYto3NVhiGHFbMiZf/exec';
+const DATA_KEY = 'realestate';   // must match CONFIG.LEAD_SECRET in Code.gs
+const FEEDBACK_URL = '';         // paste your Google Form link here; leave blank to collect feedback by email
+
+/* ---------------- Plain-English explanations ---------------- */
+const GLOSS = {
+  // inputs (by field id)
+  arv: ['After repair value (ARV)', 'What the property should be worth once any rehab is done. Used for appreciation, the sale price and the BRRRR refinance.'],
+  rehab: ['Rehab budget', 'Cash you plan to spend on repairs right after buying. It adds to the cash you need.'],
+  credit: ['Seller credit', 'Money the seller agrees to put toward your closing costs. Each loan caps how much you can use.'],
+  cash: ['Your cash available', 'Savings and gift funds you could put into this deal. Used only to check whether you can cover the cash each loan needs.'],
+  ccMode: ['Closing costs', 'Fees paid at closing (lender, attorneys, title, recording) plus prepaid taxes, insurance and interest.'],
+  ccPct: ['Closing costs (% of price)', 'A quick estimate of all closing costs. Switch to Itemized for a line-by-line Massachusetts estimate.'],
+  recording: ['Recording fees', 'Government fees to record the deed and mortgage. MA: deed $155, mortgage $205. RI: deed $84, mortgage $64 for the first page plus $1 per extra page (about $170).'],
+  lenderTitle: ["Lender's title insurance", 'Required by the lender to protect its loan if a problem with the ownership record turns up.'],
+  ownerTitle: ["Owner's title insurance", 'Optional coverage that protects your ownership against past title problems.'],
+  escrowTaxMo: ['Escrow deposit: taxes', 'Months of property taxes the lender collects at closing to start your escrow account, including a cushion (lenders can hold up to 2 months extra). The exact count depends on your closing date and when taxes are due.'],
+  escrowInsMo: ['Escrow deposit: insurance', 'Months of home insurance collected at closing for escrow, on top of the first-year premium. Often 2 to 3 months.'],
+  insMo: ['First-year insurance premium', 'Purchases usually pay the first full year of home insurance at or before closing (12 months).'],
+  prepaidDays: ['Prepaid interest', 'Interest from your closing date to the end of that month, paid at closing.'],
+  zip: ['HUD rents', "HUD's Fair Market Rents. A ZIP gives neighborhood-level rents; a town gives one metro-wide figure."],
+  cur: ['Current rent', 'What the tenant in this unit pays today.'],
+  mkt: ['Market rent', 'What this unit could rent for now, based on comps or HUD. Leave blank to use the current rent.'],
+  owner: ["Unit you'd live in", "FHA and 5–19% down conventional loans require living in one unit. Its rent is left out while you live there. Choose None for a pure investment."],
+  town: ['Town (tax estimate)', 'Pick the town to estimate yearly property taxes from its residential rate, plus any owner-occupant break. The list follows the Property state.'],
+  notes: ['Your notes', 'Private notes about this deal: what you saw, questions for the seller, next steps. They save with the deal, print on the PDF and show when you compare saved deals.'],
+  pst: ['Property state', 'Sets the state for HUD town rents, the tax estimator, recording fees and the transfer tax on sale.'],
+  assessed: ['Assessed value', 'The town\'s taxable value for this property, listed on the assessor\'s website. It\'s often well below the price, and it\'s what taxes are based on. If you leave it blank, the estimate uses the price and will likely overstate taxes.'],
+  exSave: ['Owner-occupant tax savings', 'Yearly tax break for living in the property (MA residential exemption or RI homestead). It stops when you move out.'],
+  vac: ['Vacancy & credit loss', 'Rent lost to empty units and unpaid rent. 5% is about 2–3 weeks a year per unit.'],
+  rm: ['Repairs', 'Everyday fixes and maintenance, as a share of rent collected.'],
+  capex: ['CapEx', 'Savings for big replacements like roofs, boilers, windows and appliances.'],
+  mgmt: ['Management', 'Property manager fee, often 6–10% of rent. Use 0% if you manage it yourself.'],
+  resv: ['Reserves', 'Extra monthly set-aside for surprises, on top of repairs and CapEx.'],
+  rg: ['Rent growth', 'How much rents rise each year in the projections.'],
+  eg: ['Expense growth', 'How much taxes, insurance and utilities rise each year.'],
+  app: ['Appreciation', "How much the property's value rises each year. Drives the sale price."],
+  hold: ['Hold period', 'Years you plan to own before selling. Used for sale proceeds, profit and IRR.'],
+  sell: ['Selling costs', 'Agent commission and other seller costs when you sell.'],
+  excise: ['Transfer tax on sale', 'Tax the seller pays when you sell. MA deed excise: $4.56 per $1,000 in most of the state. RI conveyance tax: $7.50 per $1,000 since Oct 1, 2025, plus the same rate again on the part of the price above $824,000 (2026 threshold, raised yearly); the app adds that extra tier automatically.'],
+  tcf: ['Target cash flow', 'Monthly cash flow you want. Used to calculate the most you should pay.'],
+  tdscr: ['Target DSCR', 'Cushion you want between income and the mortgage. 1.25x means income covers the payment by 25%.'],
+  bLtv: ['Purchase loan', 'Share of the price a short-term (hard money) lender funds.'],
+  bRehabFin: ['Rehab financed', 'Share of the rehab the short-term lender covers. You pay the rest in cash.'],
+  bRate: ['Purchase loan rate', 'Interest on the short-term loan, usually interest-only while you rehab.'],
+  bPts: ['Purchase points', 'Upfront fee on the short-term loan. 1 point = 1% of the loan.'],
+  bMonths: ['Rehab months', 'Time to rehab and rent before refinancing. Many lenders want at least 6 months.'],
+  bRefiLtv: ['Refi % of ARV', 'The new long-term loan as a share of the after repair value.'],
+  bRefiRate: ['Refi rate', 'Interest rate on the long-term refinance loan.'],
+  bRefiCC: ['Refi closing costs', 'Costs to close the refinance, as a share of the new loan.'],
+  dp: ['Down payment', 'Share of the price you pay upfront. Less down means a bigger loan and usually mortgage insurance.'],
+  rate: ['Interest rate', "Use your lender's quote for each loan type."],
+  pts: ['Points', 'Optional fee paid in cash at closing to lower your rate. 1 point = 1% of the loan and often cuts the rate about 0.25%. Enter the points on your lender\'s quote with the matching rate, or 0 if none. FHA\'s 1.75% upfront mortgage insurance is not points; it\'s already included.'],
+  mi: ['Mortgage insurance', 'Yearly rate that protects the lender when you put little down. FHA\'s rate is set automatically from loan size and down payment (0.50–0.75%); it lasts the life of the loan under 10% down, plus a 1.75% upfront premium added to the loan. Conventional PMI comes from your quote and ends at 78% loan-to-value.'],
+  fhaThresh: ['FHA mortgage insurance threshold', 'FHA charges higher yearly mortgage insurance on base loans above this amount: 0.70–0.75% instead of 0.50–0.55%. HUD set it at $726,200 in 2023; some lenders now use the 2026 conforming limit ($832,750). Confirm with your lender and change it here if needed.'],
+  min: ['Min DSCR', "The lowest rent-to-payment ratio a DSCR lender will accept, often 1.00–1.25x."],
+  // results (by label)
+  'per month, all units rented': ['Cash flow', 'Rent after vacancy, minus expenses and the full loan payment, with every unit rented.'],
+  'Operating expenses (monthly)': ['Operating expenses', 'Your monthly costs beyond the mortgage, taxes and insurance: utilities you pay, reserves, plus repairs, CapEx and management as a share of rent collected.'],
+  'All-in monthly payment w/ expenses': ['All-in monthly payment w/ expenses', 'Everything the property costs you each month: the all-in mortgage payment (PITI) plus operating expenses. Rent collected minus this number equals your cash flow.'],
+  'All-in monthly payment': ['All-in monthly payment (PITI)', 'Principal and interest, mortgage insurance, property taxes and home insurance: your full monthly housing payment.'],
+  'Your housing cost, year 1': ['Your housing cost', "What living there costs you each month after tenants' rent covers part of the payment."],
+  'Cash needed with reserves': ['Cash needed', 'Down payment, closing costs, rehab and points, minus seller credit, plus the reserves the lender wants you to keep.'],
+  'Cash-on-cash': ['Cash-on-cash return', 'Yearly cash flow divided by the cash you put in.'],
+  'IRR': ['IRR', 'Your average yearly return over the hold, counting cash flow, sale proceeds and when you receive them.'],
+  'check': ['Program check', "Whether the deal meets the loan's basic rules. For 3–4 unit FHA loans, 75% of market rent must cover the full payment (self-sufficiency test)."],
+  'NOI per year': ['Net operating income (NOI)', 'Rent after vacancy minus operating expenses, before the mortgage.'],
+  'Cap rate': ['Cap rate', 'NOI divided by price. A financing-free way to compare properties.'],
+  'Cap rate at market rents': ['Pro forma cap rate', 'Cap rate if rents rose to market, measured on the after repair value.'],
+  '1% rule': ['1% rule', 'Quick screen: monthly rent should be about 1% of the price or more.'],
+  'Monthly rent upside': ['Rent upside', 'How much more the units could rent for at market rates.'],
+  'Closing costs & prepaids': ['Closing costs & prepaids', 'Fees paid at closing plus upfront taxes, insurance and interest.'],
+  'Total cash needed': ['Total cash needed', 'Everything you need to have available: down payment, closing costs and points (minus any seller credit), plus the reserves the lender wants you to keep afterward.'],
+  'Cash to close': ['Cash to close', 'Down payment, closing costs, rehab and points, minus seller credit.'],
+  'Seller credit applied': ['Seller credit applied', "The part of the seller's credit this loan allows, capped by program limits and your closing costs."],
+  'Reserves required': ['Reserves', 'Months of the full payment (PITI) lenders want in your account after closing. FHA: 3 months for 3–4 units, none for 1–2. Conventional: 6 months for 2–4 units, none for 1. DSCR: usually 6. Owning other financed properties can add more.'],
+  'Year 1 cash flow': ['Year 1 cash flow', 'First-year cash flow. For FHA and Conventional it assumes you live in one unit.'],
+  'DSCR (NOI ÷ debt)': ['DSCR', 'Debt service coverage: NOI divided by the mortgage payment. Below 1.00x, income does not cover the loan.'],
+  'Lender DSCR (rent ÷ PITI)': ['Lender DSCR', 'How DSCR lenders qualify you: market rent divided by PITI. It ignores vacancy and repairs.'],
+  'Max price for target cash flow': ['Max price for target cash flow', 'The highest price that still hits your target cash flow with all units rented.'],
+  'Max price for target DSCR': ['Max price for target DSCR', 'The highest price that keeps DSCR at your target.'],
+  'Max price for safety cushion': ['Max price for safety cushion', 'Your own rule, not a lender\'s: the highest price where NOI covers the mortgage payment by your target DSCR (1.25x = 25% to spare). It works for any loan type and is stricter than lender tests because it counts vacancy and repairs.'],
+  "Max price the lender's test allows": ["Lender's property test", 'The highest price that passes the test the lender runs on the property itself. FHA (3–4 units): 75% of market rent must cover the full payment. DSCR loan: market rent ÷ full payment must meet the lender\'s minimum. Conventional loans and 1–2 unit FHA loans qualify on your personal income instead, so there\'s no property-based price limit.'],
+  'Net sale proceeds': ['Net sale proceeds', 'Sale price minus selling costs, the state transfer tax and the loan payoff.'],
+  'Total profit': ['Total profit', 'All cash flow plus sale proceeds, minus the cash you put in.'],
+  'Equity multiple': ['Equity multiple', 'Total cash back divided by cash put in. 2.0x means you doubled your money.'],
+  'Your cash covers it?': ['Cash check', 'Compares your cash available to the total cash this loan needs, including reserves.'],
+  'Cash in to buy & rehab': ['Cash in', 'Down payment, closing costs, points, interest and holding costs through the rehab.'],
+  'Cash out at refinance': ['Cash out', 'The new loan minus refinance costs and payoff of the short-term loan.'],
+  'Cash left in the deal': ['Cash left in', 'Cash still tied up after the refinance. Zero or less means you got it all back.'],
+  'Monthly cash flow after refi': ['Cash flow after refi', 'Monthly cash flow at market rents with the new long-term loan.'],
+  'Cash-on-cash on cash left in': ['Cash-on-cash on cash left in', 'Yearly cash flow divided by the cash still in the deal.'],
+  'Rate buydown': ['Rate buydown', 'Paying points lowers your rate. Break-even is how many months of savings it takes to repay the points.'],
+  'priceSens': ['Price sensitivity', 'How cash flow and returns change if you negotiate the price down.']
+};
+const term = (key, text, cls = '') => GLOSS[key]
+  ? `<button type="button" class="term ${cls}" data-tip="${esc(key)}" aria-expanded="false">${text}</button>` : text;
+const withTip = label => {
+  const plain = label.replace(/<[^>]+>/g, '').trim(), base = plain.replace(/\s*\([^)]*\)\s*$/, '');
+  return term(GLOSS[plain] ? plain : base, label);
+};
+
+function showTip(btn){
+  const box = $('tipBox'), [title, text] = GLOSS[btn.dataset.tip] || [];
+  if (!title) return;
+  hideTip();
+  box.innerHTML = `<b>${esc(title)}</b>${esc(text)}`; box.hidden = false;
+  btn.setAttribute('aria-expanded', 'true'); box._btn = btn;
+  const r = btn.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight;
+  let left = r.left + window.scrollX + r.width / 2 - bw / 2;
+  left = Math.max(window.scrollX + 8, Math.min(left, window.scrollX + document.documentElement.clientWidth - bw - 8));
+  let top = r.bottom + window.scrollY + 8;
+  if (r.bottom + bh + 16 > window.innerHeight && r.top > bh + 16) top = r.top + window.scrollY - bh - 8;
+  box.style.left = left + 'px'; box.style.top = top + 'px';
+}
+function hideTip(){
+  const box = $('tipBox'); if (!box || box.hidden) return;
+  box.hidden = true; if (box._btn) box._btn.setAttribute('aria-expanded', 'false'); box._btn = null;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-tip]');
+  if (b) { e.preventDefault(); ($('tipBox')._btn === b) ? hideTip() : showTip(b); return; }
+  if (!e.target.closest('#tipBox')) hideTip();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+window.addEventListener('resize', hideTip);
+
+/* ---------------- Input definitions ----------------
+   [id, label, default, unit, cssClass, options]
+   unit: "$" "%" "x" "yr" "mo" "day" "$/k" "text" "sel" "btn" "note"                                   */
+const BEDS = [["0", "Studio"], ["1", "1 BR"], ["2", "2 BR"], ["3", "3 BR"], ["4", "4+ BR"]];
+const SECTIONS = [
+  ["Property", true, [
+    ["address", "Address <span class=\"req\">(required to save)</span>", "", "text", "full"], ["pst", "Property state", "MA", "sel", "full", [["MA", "Massachusetts"], ["RI", "Rhode Island"]]], ["price", "Purchase price", 1075000, "$"], ["arv", "After repair value", 1075000, "$"],
+    ["rehab", "Rehab budget", 0, "$"], ["credit", "Seller credit", 0, "$"], ["cash", "Your cash available", "", "$", "full"]]],
+  ["Closing costs", false, [
+    ["ccMode", "How to estimate", "pct", "sel", "full", [["pct", "Percent of price"], ["ma", "Itemized (MA / RI)"]]],
+    ["ccPct", "Closing costs (% of price)", 2, "%", "full"],
+    ["attyFees", "Attorneys (buyer + lender)", 2000, "$"], ["recording", "Recording (deed + mortgage)", 360, "$"],
+    ["lenderTitle", "Lender's title (% of loan)", 0.25, "%"], ["ownerTitle", "Owner's title (% of price)", 0.2, "%"],
+    ["appraisal", "Appraisal", 900, "$"], ["inspect", "Home inspection", 800, "$"],
+    ["lenderFees", "Lender fees", 1500, "$"], ["otherFees", "Other (lien cert., plot plan)", 300, "$"],
+    ["escrowTaxMo", "Escrow deposit: taxes", 3, "mo"], ["escrowInsMo", "Escrow deposit: insurance", 2, "mo"], ["insMo", "First-year insurance premium", 12, "mo"],
+    ["prepaidDays", "Prepaid interest", 15, "day"],
+    ["ccNote", "", "Itemized mode only. Recording fees follow the property state (MA: deed $155 + mortgage $205; RI: deed $84 + mortgage $64 plus $1 per extra page). Other amounts are typical estimates. Use your lender's Loan Estimate when you have one.", "note"]]],
+  ["Rents (monthly)", true, [
+    ["hud", "", "", "hudblock", "full"],
+    ["units", "", "", "unitgrid", "full"],
+    ["other", "Other income", 0, "$"], ["owner", "Unit you'd live in", "1", "sel", "", [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["0", "None (investment only)"]]]]],
+  ["Expenses", false, [
+    ["town", "Town (tax estimate)", "", "sel", "full", [["", "Loading towns…"]]], ["assessed", "Assessed value (from the town assessor)", "", "$", "full"],
+    ["taxBtn", "Estimate taxes from town", "", "btn", "full"], ["taxOut", "", "", "note"],
+    ["tax", "Property taxes / yr", 15050, "$"], ["exSave", "Owner-occupant tax savings / yr", 0, "$"],
+    ["ins", "Insurance / yr", 3762.5, "$"], ["water", "Water / mo", 150, "$"], ["snow", "Snow / mo", 50, "$"],
+    ["elec", "Common electric / mo", 150, "$"], ["garb", "Trash / mo", 0, "$"], ["lawn", "Lawn / mo (7 mo)", 0, "$"], ["resv", "Reserves / mo", 0, "$"],
+    ["vac", "Vacancy", 5, "%"], ["rm", "Repairs", 5, "%"], ["capex", "CapEx", 5, "%"], ["mgmt", "Management", 0, "%"]]],
+  ["Growth, exit & targets", false, [
+    ["rg", "Rent growth", 3, "%"], ["eg", "Expense growth", 3, "%"], ["app", "Appreciation", 3, "%"], ["hold", "Hold period", 10, "yr"],
+    ["sell", "Selling costs (commission etc.)", 5, "%"], ["excise", "Transfer tax on sale", 4.56, "$/k"],
+    ["tcf", "Target cash flow / mo", 0, "$"], ["tdscr", "Target DSCR", 1.25, "x"]]],
+  ["BRRRR", false, [
+    ["bLtv", "Purchase loan", 80, "%"], ["bRehabFin", "Rehab financed", 100, "%"], ["bRate", "Purchase loan rate", 11, "%"], ["bPts", "Purchase points", 2, "%"],
+    ["bMonths", "Rehab months", 6, "mo"], ["bRefiLtv", "Refi % of ARV", 75, "%"], ["bRefiRate", "Refi rate", 7.5, "%"], ["bRefiCC", "Refi closing costs", 2, "%"]]],
+  ["Notes", true, [
+    ["notes", "Your notes", "", "textarea", "full"]]]
+];
+const FIN = [ // row label, id suffix, defaults for fha / conv / dscr (null = not used)
+  ["Down %", "dp", 3.5, 5, 20], ["Rate %", "rate", 6.5, 6.5, 7.5], ["Points %", "pts", 0, 0, 1],
+  ["Mort. ins. %", "mi", "auto", 0.55, null], ["Min DSCR", "min", null, null, 1.0]];
+const PCT_IDS = new Set(), TEXT_IDS = new Set(), DEFAULTS = {};
+const LOANS = { fha: 'FHA 3.5%', conv: 'Conventional', dscr: 'DSCR' };
+
+function unitGrid(){
+  const cur = [1900, 1900, 1900, 2300];
+  let h = `<div class="ugrid" id="ugrid">
+    <span class="uh" title="Unit">#</span><span class="uh">Bedrooms</span>
+    <span class="uh">${term('cur', 'Current rent')}</span><span class="uh mkt">${term('mkt', 'Market rent')}</span>`;
+  [1, 2, 3, 4].forEach(n => {
+    DEFAULTS['b' + n] = '2'; DEFAULTS['r' + n + 'c'] = cur[n - 1]; DEFAULTS['r' + n + 'm'] = '';
+    h += `<span class="un">${n}</span>
+      <select id="b${n}" aria-label="Unit ${n} bedrooms">${BEDS.map(([v, t]) => `<option value="${v}" ${v === '2' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <div class="unit"><input id="r${n}c" type="number" inputmode="decimal" step="any" value="${cur[n - 1]}" aria-label="Unit ${n} current rent"><span>$</span></div>
+      <div class="unit mkt"><input id="r${n}m" type="number" inputmode="decimal" step="any" value="" placeholder="Same" aria-label="Unit ${n} market rent"><span>$</span></div>
+      <div class="ownnote" id="ownnote${n}" hidden><b>You live here.</b> This rent isn't counted in year 1 for FHA and Conventional. It still counts for all-units-rented figures and DSCR.</div>`;
+  });
+  return h + `</div><div class="full"><button type="button" class="inline-btn" id="mktToggle">Enter market rents manually</button></div>`;
+}
+function hudBlock(){
+  DEFAULTS.zip = ''; TEXT_IDS.add('zip');
+  return `<div class="full hudbox">
+    <div class="lbl"><label for="zip">${term('zip', 'HUD rent lookup')}</label></div>
+    <div class="hudrow">
+      <input id="zip" type="text" placeholder="Town or ZIP" autocomplete="postal-code">
+      <button type="button" class="inline-btn" id="hudBtn">Get rents</button>
+    </div>
+    <p class="note" id="hudOut"></p>
+  </div>`;
+}
+
+function field([id, label, def, unit, cls, opts]){
+  if (unit === 'hudblock') return hudBlock();
+  if (unit === 'unitgrid') return unitGrid();
+  if (unit === 'textarea') {
+    DEFAULTS[id] = def; TEXT_IDS.add(id);
+    return `<div class="full"><div class="lbl"><label for="${id}">${term(id, label)}</label></div>
+      <textarea id="${id}" rows="6" maxlength="${NOTES_MAX}" placeholder="e.g., Seller motivated, roof replaced 2019, check basement for moisture, ask about parking."></textarea>
+      <div class="charcount" id="${id}Count" aria-live="polite">0 / ${NOTES_MAX}</div></div>`;
+  }
+  if (unit === 'btn') return `<div class="full"><button type="button" class="inline-btn" id="${id}">${label}</button></div>`;
+  if (unit === 'note') return `<p class="note" id="${id}">${def}</p>`;
+  DEFAULTS[id] = def;
+  if (unit === '%') PCT_IDS.add(id);
+  if (unit === 'text' || (unit === 'sel' && !/^(b\d|owner)$/.test(id))) TEXT_IDS.add(id);
+  let ctl;
+  if (unit === 'text') ctl = `<input id="${id}" type="text" value="${def}">`;
+  else if (unit === 'sel') ctl = `<select id="${id}">${opts.map(([v, t]) => `<option value="${v}" ${v === def ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  else ctl = `<div class="unit"><input id="${id}" type="number" inputmode="decimal" step="any" value="${def}"><span>${unit}</span></div>`;
+  const tkey = GLOSS[id] ? id : /^r\dc$/.test(id) ? 'cur' : /^r\dm$/.test(id) ? 'mkt' : id === 'town' ? null : null;
+  const wrapCls = (cls || '') + (/^r\dm$/.test(id) ? ' mkt' : '');
+  return `<div class="${wrapCls}"><div class="lbl"><label for="${id}">${tkey ? term(tkey, label) : label}</label></div>${ctl}</div>`;
+}
+
+const STATE_DEFAULTS = { MA: { recording: 360, excise: 4.56 }, RI: { recording: 170, excise: 7.50 } };
+const RI_TIER2 = 824000;   // RI conveyance tax extra tier threshold for 2026 (CPI-adjusted yearly)
+let PST_PREV = 'MA';
+function onStateChange(){
+  const now = $('pst').value, was = STATE_DEFAULTS[PST_PREV] || STATE_DEFAULTS.MA, next = STATE_DEFAULTS[now] || STATE_DEFAULTS.MA;
+  ['recording', 'excise'].forEach(id => {      // swap state defaults, but keep anything the investor typed
+    const el = $(id); if (el && Number(el.value) === was[id]) el.value = next[id];
+  });
+  fillTownList(''); $('taxOut').textContent = ''; $('hudOut').innerHTML = '';
+  TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = ''; $('assessed').classList.remove('needs');
+  PST_PREV = now; recalc();
+}
+const NOTES_MAX = 2000;
+let MKT_ON = false, CMP_OPEN = false, CMP_AUTO = false;
+function syncCmpMore(n){
+  const b = $('cmpMore'); if (!b) return;
+  document.querySelectorAll('#cmp .more-row').forEach(tr => { tr.style.display = CMP_OPEN ? '' : 'none'; });
+  b.hidden = !n;
+  b.textContent = CMP_OPEN ? 'See less' : `See more (${n} more rows)`;
+  b.setAttribute('aria-expanded', String(CMP_OPEN));
+}
+function syncMarket(){
+  if ([1, 2, 3, 4].some(n => $('r' + n + 'm') && $('r' + n + 'm').value !== '')) MKT_ON = true;
+  document.querySelectorAll('#form .mkt').forEach(el => { el.style.display = MKT_ON ? '' : 'none'; });
+  const g = $('ugrid'); if (g) g.classList.toggle('on', MKT_ON);
+  const t = $('mktToggle'); if (t) t.textContent = MKT_ON ? 'Remove market rents' : 'Enter market rents manually';
+}
+
+/** Marks the unit you'd live in: dims its rent (kept as entered) and shows a short explanation. */
+function syncOwner(){
+  const own = Number(($('owner') && $('owner').value) || 0);
+  [1, 2, 3, 4].forEach(n => {
+    const on = n === own, row = $('r' + n + 'c'), note = $('ownnote' + n);
+    if (!row || !note) return;
+    row.closest('.unit').classList.toggle('own', on);
+    const num = row.closest('.ugrid').querySelectorAll('.un')[n - 1]; if (num) num.classList.toggle('own', on);
+    note.hidden = !on;
+    row.setAttribute('aria-describedby', on ? 'ownnote' + n : '');
+  });
+}
+
+function updateNotesCount(){
+  const n = $('notes'), c = $('notesCount'); if (!n || !c) return;
+  c.textContent = `${n.value.length} / ${NOTES_MAX}`;
+}
+
+function buildForm(){
+  const form = document.getElementById('form'); let h = '';
+  SECTIONS.forEach(([title, open, fields], si) => {
+    h += `<details ${open ? 'open' : ''}><summary>${title}</summary><div class="rows">${fields.map(field).join('')}</div></details>`;
+    if (si === 0) {
+      h += `<details open><summary>Financing</summary><div class="fin"><span></span><span class="h">FHA</span><span class="h">Conventional</span><span class="h">DSCR</span>`;
+      FIN.forEach(([label, key, ...defs]) => {
+        h += `<span>${term(key, label)}</span>`;
+        ['fha', 'conv', 'dscr'].forEach((s, i) => {
+          const id = `${s}_${key}`;
+          if (defs[i] === null) { h += '<span></span>'; return; }
+          if (defs[i] === 'auto') { h += `<span class="auto" id="fhaMiAuto" aria-live="polite">Auto</span>`; return; }
+          DEFAULTS[id] = defs[i];
+          if (key !== 'min') PCT_IDS.add(id);
+          h += `<input id="${id}" type="number" step="any" value="${defs[i]}" aria-label="${LOANS[s]} ${label}">`;
+        });
+      });
+      h += `</div><div class="rows" style="margin-top:10px">${field(['fhaThresh', 'FHA mortgage insurance threshold', 726200, '$', 'full'])}</div><p class="hint">FHA and conventional (5–19% down) assume you live in one unit for the first year; choose None under Rents to see them as pure investments (they'll be flagged, since both require owner occupancy). DSCR assumes all units rented.</p></details>`;
+    }
+  });
+  form.innerHTML = '<p class="tiphint">Tap any dotted-underlined term for a quick explanation.</p>' + h;
+  const autoOpen = e => {            // first edit by the investor opens the full side-by-side table
+    if (CMP_AUTO || !e.isTrusted) return;
+    CMP_AUTO = true; CMP_OPEN = true;
+  };
+  form.addEventListener('input', autoOpen);
+  form.addEventListener('change', autoOpen);
+  form.addEventListener('input', recalc);
+  form.addEventListener('change', recalc);
+  form.addEventListener('submit', e => e.preventDefault());
+  $('hudBtn').onclick = hudLookup;
+  $('notes').addEventListener('input', updateNotesCount);
+  $('owner').addEventListener('change', syncOwner); syncOwner();
+  $('address').addEventListener('input', clearAddressError);
+  $('mktToggle').onclick = () => {
+    if (MKT_ON) { [1, 2, 3, 4].forEach(n => { $('r' + n + 'm').value = ''; }); MKT_ON = false; }
+    else { MKT_ON = true; }
+    syncMarket(); recalc();
+    if (MKT_ON) $('r1m').focus();
+  };
+  syncMarket();
+  $('taxBtn').onclick = taxEstimate;
+  $('assessed').addEventListener('change', () => { if (TAX_EST_DONE && $('town').value) taxEstimate(); });
+  $('tax').addEventListener('input', e => {        // investor typed their own tax bill
+    if (!e.isTrusted) return;
+    TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = '';
+    $('assessed').classList.remove('needs'); $('taxOut').textContent = '';
+  });
+  PST_PREV = $('pst').value;
+  $('pst').addEventListener('change', onStateChange);
+}
+
+function normalizeRaw(raw){
+  if (raw && raw.pst === undefined) {
+    const old = raw.taxSt || raw.st;
+    return { ...raw, pst: old === 'RI' ? 'RI' : 'MA' };
+  }
+  return raw;
+}
+function parseRaw(raw){
+  raw = normalizeRaw(raw);
+  const v = {};
+  Object.keys(DEFAULTS).forEach(id => {
+    const val = raw[id] !== undefined ? raw[id] : DEFAULTS[id];
+    if (TEXT_IDS.has(id)) { v[id] = String(val ?? '').trim(); return; }
+    const n = val === '' || val === null ? null : Number(val);
+    v[id] = n === null || isNaN(n) ? null : (PCT_IDS.has(id) ? n / 100 : n);
+  });
+  return v;
+}
+function rawInputs(){
+  const o = {}; document.querySelectorAll('#form input, #form select, #form textarea').forEach(el => o[el.id] = el.value); return o;
+}
+const readInputs = () => parseRaw(rawInputs());
+function writeInputs(raw){
+  raw = normalizeRaw(raw);
+  Object.keys(DEFAULTS).forEach(id => { const el = $(id); if (el) el.value = raw[id] !== undefined ? raw[id] : DEFAULTS[id]; });
+  MKT_ON = false; syncMarket();
+  PST_PREV = $('pst').value; fillTownList(raw.town || ''); updateNotesCount(); syncOwner();
+  TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = ''; $('taxOut').textContent = ''; $('assessed').classList.remove('needs');
+  recalc();
+}
+
+/* ---------------- Finance math ---------------- */
+const z = x => x || 0;
+const pmt = (r, n, pv) => pv <= 0 ? 0 : (r === 0 ? pv / n : pv * r / (1 - Math.pow(1 + r, -n)));
+const bal = (r, k, pay, pv) => r === 0 ? Math.max(0, pv - pay * k) : Math.max(0, pv * Math.pow(1 + r, k) - pay * (Math.pow(1 + r, k) - 1) / r);
+function irr(flows){
+  const npv = r => flows.reduce((s, c, t) => s + c / Math.pow(1 + r, t), 0);
+  let lo = -0.99, hi = 10, flo = npv(lo), fhi = npv(hi);
+  if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return null;
+  for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2, f = npv(mid); if (flo * f <= 0) { hi = mid; } else { lo = mid; flo = f; } }
+  return (lo + hi) / 2;
+}
+
+function property(v){
+  const cur = [v.r1c, v.r2c, v.r3c, v.r4c], mkt = [v.r1m, v.r2m, v.r3m, v.r4m];
+  const units = cur.filter(x => x > 0).length;
+  const gross = cur.reduce((s, x) => s + z(x), 0) + z(v.other);
+  const market = cur.reduce((s, x, i) => s + (mkt[i] > 0 ? mkt[i] : z(x)), 0) + z(v.other);
+  const ownRent = v.owner === 0 ? 0 : z(cur[(v.owner || 1) - 1]);
+  const fixedM = z(v.tax) / 12 + z(v.ins) / 12 + z(v.water) + z(v.snow) + z(v.elec) + z(v.garb) + z(v.lawn) * 7 / 12 + z(v.resv);
+  const pct = z(v.rm) + z(v.capex) + z(v.mgmt);
+  const noiFull = gross * 12 * (1 - z(v.vac)) * (1 - pct) - fixedM * 12;
+  const noiMkt = market * 12 * (1 - z(v.vac)) * (1 - pct) - fixedM * 12;
+  const price = z(v.price);
+  return { units, gross, market, ownRent, fixedM, pct, noiFull, noiMkt, price,
+    cap: price ? noiFull / price : null, proCap: v.arv ? noiMkt / v.arv : null,
+    onePct: price ? gross / price : null, grm: gross ? price / (gross * 12) : null };
+}
+
+/** Closing costs & prepaids for a given loan. */
+function closing(v, P, loan, annualRate){
+  if (v.ccMode !== 'ma') return { total: P.price * z(v.ccPct), items: null };
+  const items = [
+    ['Attorneys (buyer + lender)', z(v.attyFees)], ['Recording (deed + mortgage)', loan > 0 ? z(v.recording) : 155],
+    ["Lender's title insurance", loan * z(v.lenderTitle)], ["Owner's title insurance", P.price * z(v.ownerTitle)],
+    ['Appraisal', loan > 0 ? z(v.appraisal) : 0], ['Home inspection', z(v.inspect)], ['Lender fees', loan > 0 ? z(v.lenderFees) : 0],
+    ['Other fees', z(v.otherFees)], ['Escrow deposit: taxes', z(v.tax) / 12 * z(v.escrowTaxMo)],
+    ['Escrow deposit: insurance', z(v.ins) / 12 * z(v.escrowInsMo)],
+    ['First-year insurance premium', z(v.ins) / 12 * z(v.insMo)], ['Prepaid interest', loan * annualRate / 365 * z(v.prepaidDays)]];
+  return { total: items.reduce((s, [, x]) => s + x, 0), items };
+}
+
+function scenario(v, P, key){
+  const S = {
+    fha:  { name: LOANS.fha, ufmip: 0.0175, occ: true, resv: P.units >= 3 ? 3 : 0, capPct: 0.06 },
+    conv: { name: LOANS.conv, ufmip: 0, occ: true, resv: P.units >= 2 ? 6 : 0, capPct: z(v.conv_dp) >= 0.1 ? 0.06 : 0.03 },
+    dscr: { name: LOANS.dscr, ufmip: 0, occ: false, resv: 6, capPct: 0.03 }
+  }[key];
+  const needsOcc = S.occ, noOwner = v.owner === 0;
+  if (noOwner) S.occ = false;
+  const dp = z(v[key + '_dp']), annual = z(v[key + '_rate']), rate = annual / 12, pts = z(v[key + '_pts']);
+  const price = P.price;
+  const base = Math.max(0, price * (1 - dp)), loan = base * (1 + S.ufmip), points = loan * pts;
+  // FHA annual MIP (30-year): 0.50% / 0.55% at or below the threshold, 0.70% / 0.75% above; higher rate when LTV > 95%
+  const thresh = v.fhaThresh > 0 ? v.fhaThresh : 726200, highLtv = dp < 0.05;
+  const miRate = key === 'fha' ? (base > thresh ? (highLtv ? 0.0075 : 0.0070) : (highLtv ? 0.0055 : 0.0050))
+    : (key === 'conv' && dp < 0.2 ? z(v.conv_mi) : 0);
+  const cc = closing(v, P, loan, annual);
+  const credit = Math.max(0, Math.min(z(v.credit), S.capPct * price, cc.total + points));
+  const cashClose = price * dp + cc.total + z(v.rehab) + points - credit;
+  // FHA: annual MIP = rate x average scheduled balance of the BASE loan (no upfront premium) for that year.
+  // Conventional PMI: rate x original loan, level until it drops off.
+  const pi = pmt(rate, 360, loan), piBase = pmt(rate, 360, base);
+  const avgBase = y => { let s = 0; for (let m = 12 * (y - 1); m < 12 * y; m++) s += bal(rate, m, piBase, base); return s / 12; };
+  const miAnnual = y => key === 'fha' ? miRate * avgBase(y) : loan * miRate;
+  const miM = miRate ? miAnnual(1) / 12 : 0, debtM = pi + miM;
+  const piti = pi + miM + z(v.tax) / 12 + z(v.ins) / 12;
+  const exSave = S.occ ? z(v.exSave) : 0;
+
+  let miYears = 0;
+  if (miM > 0) {
+    if (key === 'fha') miYears = dp < 0.1 ? 30 : 11;
+    else { let k = 0; while (k < 360 && bal(rate, k, pi, loan) > 0.78 * price) k++; miYears = Math.ceil(k / 12); }
+  }
+  const gross1 = P.gross - (S.occ ? P.ownRent : 0);
+  const egi1 = gross1 * (1 - z(v.vac)), noi1 = egi1 - (P.fixedM - exSave / 12 + egi1 * P.pct);
+  const cf1 = noi1 - debtM, cfFull = P.noiFull / 12 - debtM;
+
+  let check, ok;
+  if (needsOcc && noOwner) { check = 'Requires living in a unit'; ok = false; }
+  else if (key === 'fha') {
+    if (dp < 0.035) { check = 'Down payment below 3.5%'; ok = false; }
+    else if (P.units >= 3) { ok = (P.market - z(v.other)) * 0.75 >= piti; check = ok ? 'Self-sufficiency: pass' : 'Self-sufficiency: fail'; }
+    else { check = 'OK'; ok = true; }
+  } else if (key === 'conv') { ok = dp >= 0.05 && dp < 0.2; check = ok ? 'OK' : 'Down payment outside 5–19%'; }
+  else { const ld = piti ? P.market / piti : 0; ok = dp >= 0.2 && ld >= z(v.dscr_min); check = dp < 0.2 ? 'Down payment below 20%' : (ok ? 'DSCR qualifies' : 'DSCR below minimum'); }
+
+  const reserves = S.resv * piti, totalCash = cashClose + reserves;
+  // Monthly debt per $1 of price (used for max-price targets)
+  const k = pmt(rate, 360, 1), loanPer = (1 - dp) * (1 + S.ufmip);
+  const miPer = !miRate ? 0 : key === 'fha' ? (base ? miM / price : 0) : (miRate / 12) * loanPer;
+  const denom = k * loanPer + miPer;
+  const maxCF = denom ? Math.max(0, (P.noiFull / 12 - z(v.tcf)) / denom) : null;
+  const maxDSCR = denom && v.tdscr ? Math.max(0, (P.noiFull / 12 / v.tdscr) / denom) : null;
+
+  const N = Math.max(1, Math.min(30, Math.round(z(v.hold) || 10)));
+  const flows = [-cashClose]; let cum = 0;
+  for (let y = 1; y <= N; y++) {
+    const owned = S.occ && y <= 1;
+    const g = (P.gross - (owned ? P.ownRent : 0)) * 12 * Math.pow(1 + z(v.rg), y - 1);
+    const egi = g * (1 - z(v.vac)), opex = P.fixedM * 12 * Math.pow(1 + z(v.eg), y - 1) + egi * P.pct - (owned ? exSave : 0);
+    const cf = egi - opex - pi * 12 - (y <= miYears ? miAnnual(y) : 0);
+    cum += cf; flows.push(cf);
+  }
+  const sale = z(v.arv) * Math.pow(1 + z(v.app), N), payoff = bal(rate, N * 12, pi, loan);
+  // Seller's transfer tax: MA deed excise, or RI conveyance tax plus its extra tier above the threshold
+  const tier2 = v.pst === 'RI' ? Math.max(0, sale - RI_TIER2) * z(v.excise) / 1000 : 0;
+  const transferTax = sale * z(v.excise) / 1000 + tier2;
+  const proceeds = sale * (1 - z(v.sell)) - transferTax - payoff;
+  flows[N] += proceeds;
+  const taxM = z(v.tax) / 12, insM = z(v.ins) / 12;
+  const pitiOwner = S.occ && exSave > 0 ? piti - exSave / 12 : null;
+  // Operating expenses beyond taxes & insurance, with every unit rented (matches the cash flow math)
+  const otherOpexM = (P.fixedM - z(v.tax) / 12 - z(v.ins) / 12) + P.gross * (1 - z(v.vac)) * P.pct;
+  const allInExp = piti + otherOpexM;
+  return { key, ...S, otherOpexM, allInExp, miRate, transferTax, dp, annual, pts, loan, points, cc, cashClose, credit, debtM, pi, miM, taxM, insM, piti, pitiOwner,
+    cf1, cfFull, housing: S.occ ? -cf1 : null,
+    coc: cashClose > 0 ? cfFull * 12 / cashClose : null, dscr: debtM ? P.noiFull / 12 / debtM : null,
+    lenderDscr: piti ? P.market / piti : null, check, ok, reserves, totalCash, maxCF, maxDSCR,
+    proceeds, profit: proceeds + cum - cashClose, multiple: cashClose > 0 ? (proceeds + cum) / cashClose : null,
+    irr: cashClose > 0 ? irr(flows) : null, N };
+}
+
+function brrrr(v, P){
+  const price = P.price, rehab = z(v.rehab);
+  const loan = price * z(v.bLtv) + rehab * z(v.bRehabFin);
+  const cc = closing(v, P, loan, z(v.bRate)).total;
+  const cashIn = price * (1 - z(v.bLtv)) + rehab * (1 - z(v.bRehabFin)) + cc + loan * z(v.bPts)
+    + loan * z(v.bRate) / 12 * z(v.bMonths) + P.fixedM * z(v.bMonths);
+  const refi = z(v.arv) * z(v.bRefiLtv), cashOut = refi - refi * z(v.bRefiCC) - loan;
+  const left = cashIn - cashOut, pi = pmt(z(v.bRefiRate) / 12, 360, refi), cf = P.noiMkt / 12 - pi;
+  return { cashIn, cashOut, left, cf, covers: refi * (1 - z(v.bRefiCC)) >= loan,
+    coc: left <= 0 ? Infinity : cf * 12 / left, dscr: pi ? P.noiMkt / 12 / pi : null };
+}
+
+/**
+ * Highest price where test(scenario) still passes, found by searching with the full loan math
+ * (handles FHA mortgage insurance tiers and anything else that changes with price).
+ */
+function maxPriceFor(v, key, test){
+  const at = p => { const vv = { ...v, price: p }; return scenario(vv, property(vv), key); };
+  let lo = 0, hi = Math.max(z(v.price), 1) * 4;
+  if (!test(at(1000))) return 0;                 // can't pass even at a nominal price
+  if (test(at(hi))) return hi;                   // passes even far above the asking price
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (test(at(mid))) lo = mid; else hi = mid; }
+  return Math.floor(lo / 100) * 100;             // round down to the nearest $100
+}
+
+const analyze = v => {
+  const P = property(v);
+  const R = ['fha', 'conv', 'dscr'].map(k => scenario(v, P, k));
+  R.forEach(r => {
+    r.maxCF = maxPriceFor(v, r.key, x => x.cfFull >= z(v.tcf));
+    r.maxDSCR = v.tdscr ? maxPriceFor(v, r.key, x => x.dscr !== null && x.dscr >= v.tdscr) : null;
+    // What the lender itself tests on the property (not the investor's own cushion)
+    if (r.key === 'fha') {
+      if (P.units >= 3) {
+        const rentTest = (P.market - z(v.other)) * 0.75;               // FHA self-sufficiency: 75% of market rent
+        r.maxLender = maxPriceFor(v, 'fha', x => rentTest >= x.piti);
+        r.lenderNote = 'Self-sufficiency test';
+      } else { r.maxLender = null; r.lenderNote = 'No property test for 1–2 units'; }
+    } else if (r.key === 'conv') {
+      r.maxLender = null; r.lenderNote = 'Qualifies on your income';
+    } else {
+      r.maxLender = maxPriceFor(v, 'dscr', x => x.lenderDscr !== null && x.lenderDscr >= z(v.dscr_min));
+      r.lenderNote = `Rent ÷ payment ≥ ${z(v.dscr_min).toFixed(2)}x`;
+    }
+  });
+  return { v, P, R, B: brrrr(v, P) };
+};
+
+/* ---------------- Rendering ---------------- */
+const $ = id => document.getElementById(id);
+const usd = n => n === null || n === undefined || !isFinite(n) ? '–' : (n < 0 ? '−' : '') + '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+const pct = (n, d = 1) => n === null || n === undefined ? '–' : n === Infinity ? 'Infinite' : (n * 100).toFixed(d) + '%';
+const xx = n => n === null || !isFinite(n) ? '–' : n.toFixed(2) + 'x';
+const sign = n => n < 0 ? 'neg' : 'pos';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let LAST = null, TOOL = 'fha';
+const NOTES = { hud: '', tax: '' };
+
+function recalc(){
+  const v = readInputs(), P = property(v);
+  const itemized = v.ccMode === 'ma';
+  ['attyFees','recording','lenderTitle','ownerTitle','appraisal','inspect','lenderFees','otherFees','escrowTaxMo','escrowInsMo','insMo','prepaidDays']
+    .forEach(id => { const el = $(id); if (el) el.closest('div.unit').parentElement.style.display = itemized ? '' : 'none'; });
+  $('ccPct').closest('div.unit').parentElement.style.display = itemized ? 'none' : '';
+  $('ccNote').style.display = itemized ? '' : 'none';
+
+  if (!P.price || !P.gross) { $('verdict').textContent = 'Enter a purchase price and at least one rent to see results.'; return; }
+  const A = analyze(v); LAST = A; const { R, B } = A;
+  if ($('fhaMiAuto')) $('fhaMiAuto').textContent = (R[0].miRate * 100).toFixed(2) + '% auto';
+
+  const best = R.filter(r => r.ok).sort((a, b) => b.cfFull - a.cfFull)[0] || R.slice().sort((a, b) => b.cfFull - a.cfFull)[0];
+  const maxOffer = Math.max(...R.map(r => r.maxCF || 0));
+  $('verdict').textContent = best.cfFull >= z(v.tcf)
+    ? `${best.name} works best here: ${usd(best.cfFull)} a month once every unit is rented.`
+    : `At ${usd(P.price)}, no loan hits your cash flow target. The highest offer that does is about ${usd(maxOffer)}.`;
+
+  $('strip').innerHTML = R.map(r => `<div class="loan">
+      <h3>${r.name}</h3><div class="sub">${pct(r.dp)} down, ${usd(r.loan)} loan</div>
+      <div class="big ${sign(r.cfFull)}">${usd(r.cfFull)}</div>
+      <div class="cap">${term('per month, all units rented', 'per month, all units rented')}</div>
+      <div class="piti"><span>${term('All-in monthly payment', 'All-in monthly payment')}</span><b>${usd(r.piti)}</b></div>
+      <p class="piti-sub">Mortgage ${usd(r.pi)}${r.miM ? ` + mortgage insurance ${usd(r.miM)}` : ''} + taxes ${usd(r.taxM)} + insurance ${usd(r.insM)}${
+        r.pitiOwner !== null ? `<br>${usd(r.pitiOwner)} while you live there (owner-occupant tax break)` : ''}</p>
+      <span class="badge ${r.ok ? 'ok' : 'no'}">${term('check', esc(r.check))}</span>
+      <div style="margin-top:10px">
+        ${r.housing !== null ? `<div class="kv"><span>${term('Your housing cost, year 1', 'Your housing cost, year 1')}</span><b>${usd(r.housing)}/mo</b></div>` : ''}
+        <div class="kv"><span>${term('Cash needed with reserves', 'Cash needed with reserves')}</span><b>${usd(r.totalCash)}</b></div>
+        <div class="kv"><span>${term('Cash-on-cash', 'Cash-on-cash')}</span><b class="${sign(r.coc)}">${pct(r.coc)}</b></div>
+        <div class="kv"><span>${term('IRR', 'IRR over ' + r.N + ' yrs')}</span><b>${pct(r.irr)}</b></div>
+      </div></div>`).join('');
+
+  $('propStats').innerHTML = [
+    [usd(P.noiFull), 'NOI per year'], [pct(P.cap, 2), 'Cap rate'], [pct(P.proCap, 2), 'Cap rate at market rents'],
+    [pct(P.onePct, 2), '1% rule'], [usd(P.market - P.gross), 'Monthly rent upside']
+  ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${withTip(s)}</span></div>`).join('');
+
+  const ask = P.price;
+  const maxCell = (m, cap) => {
+    if (m === null || m === undefined) return '–';
+    const d = m - ask, tag = Math.abs(d) < 500 ? 'at asking' : d > 0 ? `${usd(d)} above asking` : `${usd(-d)} below asking`;
+    return `<b class="maxv">${usd(m)}</b><span class="maxd ${d >= 0 ? 'pos' : 'neg'}">${tag}</span>${cap ? `<span class="maxcap">${esc(cap)}</span>` : ''}`;
+  };
+  const G = label => ['__group', label];          // small gray section label inside the table
+  const rows = [
+    G('What to offer'),
+    [`Max price for target cash flow <span class="tgt">(${usd(z(v.tcf))}/mo)</span>`, r => maxCell(r.maxCF), 'hl'],
+    [`Max price the lender's test allows`, r => r.maxLender !== null ? maxCell(r.maxLender, r.lenderNote) : `<span class="maxnote">${esc(r.lenderNote)}</span>`, 'hl'],
+    G('Monthly'),
+    ['<b>All-in monthly payment</b>', r => `<b>${usd(r.piti)}</b>`],
+    ['<b>All-in monthly payment w/ expenses</b>', r => `<b>${usd(r.allInExp)}</b>`],
+    ['Year 1 cash flow', r => `<span class="${sign(r.cf1)}">${usd(r.cf1)}</span>`],
+    G('Cash to buy'),
+    ['<b>Total cash needed</b>', r => `<b>${usd(r.totalCash)}</b>`],
+    ['Cash to close', r => usd(r.cashClose)],
+    ['Reserves required', r => usd(r.reserves)],
+    ['Closing costs & prepaids', r => usd(r.cc.total)],
+    ['Seller credit applied', r => usd(r.credit)],
+    ...(v.cash !== null ? [['Your cash covers it?', r => v.cash >= r.totalCash ? '<span class="pos">Yes</span>' : `<span class="neg">Short ${usd(r.totalCash - v.cash)}</span>`]] : []),
+    G('Monthly breakdown'),
+    ['Principal & interest', r => usd(r.pi)], ['Mortgage insurance', r => usd(r.miM)],
+    ['Property taxes (monthly)', r => usd(r.taxM)], ['Home insurance (monthly)', r => usd(r.insM)],
+    ['Operating expenses (monthly)', r => usd(r.otherOpexM)],
+    G('Risk check'),
+    [`Max price for safety cushion <span class="tgt">(${(z(v.tdscr) || 0).toFixed(2)}x DSCR)</span>`, r => maxCell(r.maxDSCR), 'hl'],
+    ['DSCR (NOI ÷ debt)', r => xx(r.dscr)], ['Lender DSCR (rent ÷ PITI)', r => xx(r.lenderDscr)],
+    G(`Long-term (${R[0].N}-year hold)`),
+    ['Net sale proceeds', r => usd(r.proceeds)], ['Total profit', r => usd(r.profit)], ['Equity multiple', r => xx(r.multiple)]
+  ];
+  // Collapsed view: everything through "Reserves required" (what to offer, monthly, cash to buy totals)
+  const cut = rows.findIndex(([l]) => l === 'Reserves required');
+  $('cmp').innerHTML = `<thead><tr><th></th>${R.map(r => `<th>${r.name}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(([l, fn, cls], i) => {
+      const more = i > cut ? 'more-row' : '';
+      if (l === '__group') return `<tr class="grp ${more}"><td colspan="${R.length + 1}">${esc(fn)}</td></tr>`;
+      return `<tr class="${more} ${cls || ''}"><td>${withTip(l)}</td>${R.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`;
+    }).join('') + '</tbody>';
+  syncCmpMore(rows.filter(([l], i) => i > cut && l !== '__group').length);
+
+  $('brrrr').innerHTML = [
+    [usd(B.cashIn), 'Cash in to buy & rehab'], [usd(B.cashOut), 'Cash out at refinance'],
+    [usd(B.left), 'Cash left in the deal'], [usd(B.cf), 'Monthly cash flow after refi'], [pct(B.coc), 'Cash-on-cash on cash left in']
+  ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${withTip(s)}</span></div>`).join('');
+  $('brrrrNote').textContent = B.covers ? 'The refinance pays off the purchase loan.'
+    : 'The refinance does not cover the purchase loan. BRRRR needs an ARV well above price plus rehab.';
+  renderTools();
+}
+
+/* ---------------- Rate buydown & price sensitivity ---------------- */
+function renderTools(){
+  if (!LAST) return;
+  const { v, P } = LAST, k = TOOL, step = (Number($('step').value) || 0) / 100;
+  const base = scenario(v, P, k);
+  const buy = [0, 0.01, 0.02, 0.03].map(p => {
+    const vv = { ...v, [k + '_pts']: p, [k + '_rate']: Math.max(0, v[k + '_rate'] - (p - z(v[k + '_pts'])) / 0.01 * step) };
+    return scenario(vv, P, k);
+  });
+  const zero = buy[0];
+  $('buyTbl').innerHTML = `<thead><tr><th>Points</th><th>Rate</th><th>Mortgage payment<br><span class="thsub">P&amp;I + mortgage ins.</span></th><th>Points cost</th><th>Monthly savings</th><th>Break-even</th></tr></thead><tbody>` +
+    buy.map(r => {
+      const save = zero.debtM - r.debtM, be = save > 0 ? Math.ceil(r.points / save) : null;
+      const cur = Math.abs(r.pts - base.pts) < 1e-9 ? ' (current)' : '';
+      return `<tr><td>${(r.pts * 100).toFixed(0)}${cur}</td><td>${(r.annual * 100).toFixed(3)}%</td><td>${usd(r.debtM)}</td><td>${usd(r.points)}</td>
+        <td>${r.pts ? usd(save) : '–'}</td><td>${be ? be + ' mo' + (be <= 12 * base.N ? '' : ' (past your hold)') : '–'}</td></tr>`;
+    }).join('') + '</tbody>';
+  const prices = [1, 0.98, 0.96, 0.94, 0.92, 0.9];
+  $('sensTbl').innerHTML = `<thead><tr><th>% of price</th><th>Price</th><th>Cash to close</th><th>Mortgage payment<br><span class="thsub">P&amp;I + mortgage ins.</span></th><th>Cash flow, all rented</th><th>Cash-on-cash</th><th>DSCR<br><span class="thsub">NOI ÷ debt</span></th></tr></thead><tbody>` +
+    prices.map(f => {
+      const vv = { ...v, price: P.price * f }, PP = property(vv), r = scenario(vv, PP, k);
+      return `<tr><td>${Math.round(f * 100)}%</td><td>${usd(PP.price)}</td><td>${usd(r.cashClose)}</td><td>${usd(r.debtM)}</td>
+        <td class="${sign(r.cfFull)}">${usd(r.cfFull)}</td><td>${pct(r.coc)}</td><td>${xx(r.dscr)}</td></tr>`;
+    }).join('') + '</tbody>';
+  $('sensNote').textContent = 'Cash-on-cash = yearly cash flow ÷ cash to close (reserves stay in your account). ' +
+    'Property taxes stay the same at every price, since MA and RI taxes follow the assessed value, not the sale price.';
+}
+
+/* ---------------- HUD rents & MA taxes ---------------- */
+let TAX = [], TAX_LOADED = false, TAX_FROM_PRICE = false, TAX_EST_DONE = false;
+async function hudLookup(){
+  const out = $('hudOut'), btn = $('hudBtn'), q = $('zip').value.trim();
+  if (!q) { out.textContent = 'Enter a town or ZIP first (for example, Boston or 02124).'; return; }
+  btn.disabled = true; out.textContent = 'Looking up HUD rents…';
+  try {
+    const r = await call('getFmr', q, $('pst').value || 'MA');
+    if (!r.ok) { out.textContent = r.error; return; }
+    NOTES.hud = `HUD ${r.kind}, FY${r.year}: ${r.area}`;
+    out.innerHTML = `<b>${esc(NOTES.hud)}</b>
+      <table class="hud"><thead><tr><th>Unit size</th><th>Fair Market Rent</th><th>110% voucher cap</th></tr></thead><tbody>
+      ${['Studio','1 BR','2 BR','3 BR','4 BR'].map((t, i) => `<tr><td>${t}</td><td>${usd(r.rents[i])}</td><td>${usd(r.rents[i] * 1.1)}</td></tr>`).join('')}
+      </tbody></table>
+      HUD sets these near the 40th percentile of local rents, so they run conservative.
+      <br><button type="button" class="inline-btn" id="hudUse">Use as market rents</button>`;
+    $('hudUse').onclick = () => {
+      [1, 2, 3, 4].forEach(n => {
+        const cur = Number($('r' + n + 'c').value);
+        if (cur > 0) $('r' + n + 'm').value = r.rents[Number($('b' + n).value)] || '';
+      });
+      MKT_ON = true; syncMarket(); recalc(); toast('Market rents filled from HUD');
+    };
+  } catch (e) { out.textContent = e.message; }
+  finally { btn.disabled = false; }
+}
+
+async function loadTaxRates(){
+  try {
+    const r = await call('getTaxRates');
+    TAX = r.towns || [];
+  } catch (e) { TAX = []; }
+  TAX_LOADED = true; fillTownList();
+}
+/** Fills the Town dropdown with every town on file for the Property state, A to Z. */
+function fillTownList(keep){
+  const sel = $('town'); if (!sel) return;
+  const want = keep !== undefined ? keep : sel.value;
+  const st = ($('pst') && $('pst').value) || 'MA';
+  const towns = TAX.filter(t => (t.state || 'MA') === st).map(t => t.town)
+    .sort((a, b) => a.localeCompare(b));
+  const first = !TAX_LOADED ? 'Loading towns…' : towns.length ? 'Select a town' : 'No towns on file for this state';
+  sel.innerHTML = `<option value="">${first}</option>` + towns.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  sel.value = towns.includes(want) ? want : '';
+}
+
+function taxEstimate(){
+  const out = $('taxOut'), name = $('town').value.trim().toLowerCase(), st = $('pst').value || 'MA';
+  const stName = st === 'RI' ? 'Rhode Island' : 'Massachusetts';
+  if (!TAX.length) { out.textContent = 'Town tax rates aren\'t available right now. Enter the tax bill manually.'; return; }
+  const t = TAX.find(x => x.town.toLowerCase() === name && (x.state || 'MA') === st);
+  if (!t) { out.textContent = name ? `Pick a ${stName} town from the list.` : 'Choose a town first.'; return; }
+  const fromPrice = !(Number($('assessed').value) > 0);
+  const assessed = fromPrice ? (Number($('price').value) || 0) : Number($('assessed').value);
+  const units = [1, 2, 3, 4].filter(n => Number($('r' + n + 'c').value) > 0).length || 1;
+  const one = units === 1;
+  const nonRate = (one && t.rate1) || t.rate;
+  const ownRate = (one && (t.ownerRate1 || t.ownerRate)) || t.ownerRate || nonRate;
+  const tax = Math.round(assessed * nonRate / 1000);
+  const ownTaxable = Math.max(0, assessed * (1 - (t.exemptPct || 0)) - (t.exempt || 0));
+  const ownTax = Math.round(ownTaxable * ownRate / 1000);
+  const save = Math.max(0, tax - ownTax);
+  $('tax').value = tax; $('exSave').value = save;
+  const rateNote = ownRate !== nonRate ? `, $${ownRate.toFixed(2)} if owner-occupied` : '';
+  TAX_FROM_PRICE = fromPrice; TAX_EST_DONE = true;
+  NOTES.tax = `${t.town}, ${st} FY${t.fy} residential rate $${nonRate.toFixed(2)} per $1,000${rateNote}, on ` +
+    (fromPrice ? `the ${usd(assessed)} price (assessed value not entered)` : `an assessed value of ${usd(assessed)}`) +
+    (one ? ' (1-unit rates)' : '');
+  const result = `${usd(tax)} a year as an investor${fromPrice ? ' (based on price)' : ''}. ` + (save
+    ? `Owner-occupants pay about ${usd(ownTax)}, saving ${usd(save)} a year; applied to FHA and Conventional while you live there.`
+    : `No owner-occupant break on file for ${t.town}.`);
+  out.innerHTML = (fromPrice ? `<div class="taxwarn" role="alert"><b>Using the price as the assessed value.</b> Assessments are often much lower than
+      the price, which can overstate taxes by thousands a year. Look up this property's assessed value on the ${esc(t.town)} assessor's site and enter it above;
+      the estimate will update.</div>` : '') + `<span>${esc(NOTES.tax)}: ${esc(result)}</span>`;
+  $('assessed').classList.toggle('needs', fromPrice);
+  recalc();
+}
+
+/* ---------------- Compare saved deals ---------------- */
+function renderPicks(){
+  $('picks').innerHTML = DEALS.length ? DEALS.map((d, i) =>
+    `<label><input type="checkbox" data-i="${i}"> ${esc(d.address)} <span class="hint" style="margin:0">(${esc(d.date)})</span></label>`).join('')
+    : '<span class="hint" style="margin:0">No saved deals yet. Use Save deal first.</span>';
+  $('picks').querySelectorAll('input').forEach(cb => cb.onchange = () => {
+    const on = [...$('picks').querySelectorAll('input:checked')];
+    if (on.length > 4) { cb.checked = false; toast('Pick up to 4 deals.'); return; }
+    renderDealCompare(on.map(x => DEALS[x.dataset.i]));
+  });
+  $('dealTbl').innerHTML = '';
+}
+function renderDealCompare(list){
+  if (!list.length) { $('dealTbl').innerHTML = ''; return; }
+  const A = list.map(d => { try { return { d, a: analyze(parseRaw(JSON.parse(d.inputs))) }; } catch (e) { return null; } }).filter(Boolean);
+  const bestOf = a => a.R.slice().sort((x, y) => y.cfFull - x.cfFull)[0];
+  const rows = [
+    ['Price', a => usd(a.P.price)], ['Units', a => a.P.units], ['NOI / yr', a => usd(a.P.noiFull)], ['Cap rate', a => pct(a.P.cap, 2)],
+    ['1% rule', a => pct(a.P.onePct, 2)],
+    ...a0keys(), ['Best loan', a => bestOf(a).name], ['Cash needed (best loan)', a => usd(bestOf(a).totalCash)],
+    ['Best IRR', a => { const r = a.R.filter(x => x.irr !== null).sort((x, y) => y.irr - x.irr)[0]; return r ? `${pct(r.irr)} (${r.name})` : '–'; }],
+    ['Max price for target cash flow', a => usd(Math.max(...a.R.map(r => r.maxCF || 0)))],
+    ['BRRRR cash left in', a => usd(a.B.left)],
+    ['Notes', a => a.v.notes ? esc(a.v.notes.length > 90 ? a.v.notes.slice(0, 90) + '…' : a.v.notes) : '—']
+  ];
+  function a0keys(){ return ['fha', 'conv', 'dscr'].map((k, i) => [`${LOANS[k]} cash flow / mo`, a => `<span class="${sign(a.R[i].cfFull)}">${usd(a.R[i].cfFull)}</span>`]); }
+  $('dealTbl').innerHTML = `<thead><tr><th></th>${A.map(x => `<th>${esc(x.d.address)}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(([l, fn]) => `<tr><td>${l}</td>${A.map(x => `<td>${fn(x.a)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+}
+
+/* ---------------- PDF & pipeline ---------------- */
+/** Shared look for every PDF (deal summary and client cheat sheet). */
+const PDF_CSS = `
+    .pdf{font-family:Arial,Helvetica,sans-serif;color:#17324D;font-size:10.5px;line-height:1.4}
+    .pdf table{border-collapse:collapse;width:100%;font-size:10.5px;color:#17324D;font-family:Arial,Helvetica,sans-serif}
+    .pdf td,.pdf th{border:none;border-bottom:1px solid #E1E5EB;padding:5px 7px;text-align:left;vertical-align:top}
+    .pdf .num{text-align:right;white-space:nowrap}
+    .pdf .lbl{color:#34495E}
+    .pdf .neg{color:#A63D2F;font-weight:bold}.pdf .pos{color:#2F6B4F;font-weight:bold}
+    .pdf .band td{border:none;padding:0 0 10px 0;vertical-align:bottom}
+    .pdf .band td.bandrule{border-bottom:3px solid #17324D}
+    .pdf .kicker{font-size:9px;letter-spacing:1px;color:#A87A12;font-weight:bold}
+    .pdf .addr{font-size:19px;font-weight:bold;color:#17324D;margin-top:2px}
+    .pdf .sub{font-size:10px;color:#5B6B7C;margin-top:3px}
+    .pdf .brand{text-align:right;font-size:10px;color:#5B6B7C}
+    .pdf .brand b{color:#17324D;font-size:11px}
+    .pdf .verdict td{border:none;border-left:4px solid #C8962E;padding:9px 12px;font-size:12.5px;font-weight:bold;color:#17324D}
+    .pdf .kpis td{border:1px solid #D5DBE3;text-align:center;padding:8px 4px;width:20%}
+    .pdf .kpis .v{font-size:15px;font-weight:bold;display:block;color:#17324D}
+    .pdf .kpis .l{font-size:8.5px;color:#5B6B7C;display:block;margin-top:2px}
+    .pdf h2{font-size:12px;color:#17324D;margin:16px 0 6px;padding-bottom:4px;border-bottom:2px solid #17324D}
+    .pdf th{font-size:10px;text-align:right;padding:7px;color:#17324D;border-bottom:1.5px solid #17324D}
+    .pdf th:first-child{text-align:left}
+    .pdf th.best{border-top:3px solid #C8962E}
+    .pdf .tag{font-size:8px;font-weight:bold;color:#A87A12;margin-top:1px}
+    .pdf .grp td{color:#5B6B7C;font-size:8.5px;letter-spacing:.6px;font-weight:bold;padding-top:10px;border-bottom:1px solid #C9D1DB}
+    .pdf .total td{font-weight:bold;border-top:1.5px solid #17324D}
+    .pdf .two td.col{width:50%;border:none;padding:0 8px 0 0;vertical-align:top}
+    .pdf .two td.col + td.col{padding:0 0 0 8px}
+    .pdf .keep{page-break-inside:avoid}
+    .pdf .fin tr{page-break-inside:avoid}
+    .pdf .fin td{padding:4px 7px}
+    .pdf .fin td.lbl{width:37%}
+    .pdf .rating{font-size:15px;font-weight:bold}
+    .pdf .verdict .say{font-size:11px;font-weight:normal;margin-top:3px}
+    .pdf .note{font-size:9px;color:#5B6B7C;margin-top:3px}
+    .pdf .hl td{font-weight:bold;font-size:11px;border-top:1px solid #C8962E;border-bottom:1px solid #C8962E}
+    .pdf .hl td.lbl{border-left:4px solid #C8962E;color:#17324D}
+    .pdf .notebox{font-size:10.5px;line-height:1.5;color:#17324D;padding:4px 2px}
+    .pdf .foot{margin-top:14px;padding-top:8px;border-top:1px solid #E1E5EB;font-size:8.5px;color:#6B7A8C}
+  
+`;
+
+function summaryHtml(){
+  const { v, P, R, B } = LAST;
+  const st = v.pst === 'RI' ? 'Rhode Island' : 'Massachusetts';
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const money = n => `<span class="${n < 0 ? 'neg' : 'pos'}">${usd(n)}</span>`;
+  const ok = R.filter(r => r.ok), best = (ok.length ? ok : R).slice().sort((a, b) => b.cfFull - a.cfFull)[0];
+  const head = R.map(r => `<th class="${r.key === best.key ? 'best' : ''}">${esc(r.name)}${r.key === best.key ? '<div class="tag">Best fit</div>' : ''}</th>`).join('');
+  const group = t => `<tr class="grp"><td colspan="${R.length + 1}">${t}</td></tr>`;
+  const row = (l, fn, cls = '') => `<tr class="${cls}"><td class="lbl">${l}</td>${R.map(r => `<td class="num"${r.key === best.key ? ' bgcolor="#F4F7FA"' : ''}>${fn(r)}</td>`).join('')}</tr>`;
+  const kv = (l, x) => `<tr><td class="lbl">${l}</td><td class="num">${x}</td></tr>`;
+  const units = [1, 2, 3, 4].filter(n => z(v['r' + n + 'c']) > 0);
+  const beds = n => ({ 0: 'Studio', 1: '1 BR', 2: '2 BR', 3: '3 BR', 4: '4+ BR' })[v['b' + n]] || '—';
+  const notes = [NOTES.hud, NOTES.tax].filter(Boolean);
+  return `<style>${PDF_CSS}</style>
+  <div class="pdf">
+    <table class="band"><tr>
+      <td class="bandrule"><div class="kicker">DEAL SUMMARY</div>
+        <div class="addr">${esc(v.address || 'Untitled property')}</div>
+        <div class="sub">${st} &nbsp;|&nbsp; ${P.units} unit${P.units === 1 ? '' : 's'} &nbsp;|&nbsp; Prepared ${date}</div></td>
+      <td class="brand bandrule"><b>${esc(BRAND.name)}</b><br>${esc(BRAND.company)}${BRAND.email ? '<br>' + esc(BRAND.email) : ''}</td>
+    </tr></table>
+
+    <table class="verdict" style="margin:12px 0"><tr><td bgcolor="#F2F5F8">${esc($('verdict').textContent)}</td></tr></table>
+
+    <table class="kpis"><tr>
+      <td><span class="v">${usd(P.price)}</span><span class="l">Purchase price</span></td>
+      <td><span class="v">${usd(P.gross)}</span><span class="l">Gross rent / month</span></td>
+      <td><span class="v">${usd(P.noiFull)}</span><span class="l">NOI / year</span></td>
+      <td><span class="v">${pct(P.cap, 2)}</span><span class="l">Cap rate</span></td>
+      <td><span class="v">${money(best.cfFull)}</span><span class="l">Cash flow / mo (${esc(best.name)})</span></td>
+    </tr></table>
+
+    <h2>Financing comparison</h2>
+    <table class="fin">
+      <tr><th></th>${head}</tr>
+      ${group('LOAN')}
+      ${row('Down payment', r => pct(r.dp))}
+      ${row('Rate / points', r => `${(r.annual * 100).toFixed(3)}% / ${(r.pts * 100).toFixed(1).replace(/\.0$/, '')}`)}
+      ${row('Loan amount', r => usd(r.loan))}
+      ${group('CASH NEEDED')}
+      ${row('Closing costs &amp; prepaids', r => usd(r.cc.total))}
+      ${row('Cash to close', r => usd(r.cashClose))}
+      ${row('Reserves required', r => usd(r.reserves))}
+      ${row('Total cash needed', r => usd(r.totalCash), 'total')}
+      ${group('MONTHLY PAYMENT')}
+      ${row('Principal &amp; interest', r => usd(r.pi))}
+      ${row('Mortgage insurance', r => usd(r.miM))}
+      ${row('Property taxes', r => usd(r.taxM))}
+      ${row('Home insurance', r => usd(r.insM))}
+      ${row('All-in monthly payment', r => usd(r.piti), 'total')}
+      ${row('Operating expenses', r => usd(r.otherOpexM))}
+      ${row('All-in w/ expenses', r => usd(r.allInExp), 'total')}
+      ${group('PERFORMANCE')}
+      ${row('Cash flow / month, all units rented', r => money(r.cfFull))}
+      ${row('Your housing cost, year 1', r => r.housing === null ? '—' : usd(r.housing))}
+      ${row('Cash-on-cash return', r => pct(r.coc))}
+      ${row('DSCR (NOI ÷ debt)', r => xx(r.dscr))}
+      ${row('Lender DSCR (rent ÷ PITI)', r => xx(r.lenderDscr))}
+      ${row('Program check', r => `<span class="${r.ok ? 'pos' : 'neg'}">${esc(r.check)}</span>`)}
+      ${row(`Max price for target cash flow (${usd(z(v.tcf))}/mo)`, r => usd(r.maxCF), 'hl')}
+      ${row(`Max price the lender's test allows`, r => r.maxLender !== null ? usd(r.maxLender) : `<span style="font-weight:normal;font-style:italic">${esc(r.lenderNote)}</span>`, 'hl')}
+      ${row(`Max price for safety cushion (${(z(v.tdscr) || 0).toFixed(2)}x DSCR)`, r => usd(r.maxDSCR), 'hl')}
+      ${group(`EXIT AFTER ${best.N} YEARS`)}
+      ${row('Net sale proceeds', r => usd(r.proceeds))}
+      ${row('Total profit', r => money(r.profit))}
+      ${row('Equity multiple', r => xx(r.multiple))}
+      ${row('IRR', r => pct(r.irr), 'total')}
+    </table>
+
+    <table class="two keep" style="margin-top:6px"><tr>
+      <td class="col">
+        <h2>Property</h2>
+        <table>
+          ${kv('After repair value', usd(v.arv))}
+          ${kv('Gross rent, market / month', usd(P.market))}
+          ${kv('Property taxes / year', usd(v.tax))}
+          ${kv('Insurance / year', usd(v.ins))}
+          ${kv('Pro forma cap rate', pct(P.proCap, 2))}
+          ${kv('1% rule', pct(P.onePct, 2))}
+        </table>
+        <h2>Rent roll</h2>
+        <table>
+          <tr><th>Unit</th><th>Size</th><th>Current</th><th>Market</th></tr>
+          ${units.map(n => `<tr><td>Unit ${n}</td><td class="num">${beds(n)}</td><td class="num">${usd(v['r' + n + 'c'])}</td><td class="num">${v['r' + n + 'm'] > 0 ? usd(v['r' + n + 'm']) : '—'}</td></tr>`).join('')}
+          <tr class="total"><td>Total</td><td></td><td class="num">${usd(P.gross - z(v.other))}</td><td class="num">${usd(P.market - z(v.other))}</td></tr>
+        </table>
+      </td>
+      <td class="col">
+        <h2>BRRRR</h2>
+        <table>
+          ${kv('Cash in to buy &amp; rehab', usd(B.cashIn))}
+          ${kv('Cash out at refinance', usd(B.cashOut))}
+          ${kv('Cash left in the deal', usd(B.left))}
+          ${kv('Cash flow / month after refi', money(B.cf))}
+        </table>
+        <h2>Key assumptions</h2>
+        <table>
+          ${kv('Closing costs', v.ccMode === 'ma' ? 'Itemized (' + (v.pst || 'MA') + ' fees)' : pct(v.ccPct, 1) + ' of price')}
+          ${kv('Vacancy / repairs / CapEx / mgmt', [v.vac, v.rm, v.capex, v.mgmt].map(x => pct(x, 0)).join(' / '))}
+          ${kv('Rent / expense growth, appreciation', [v.rg, v.eg, v.app].map(x => pct(x, 0)).join(' / '))}
+          ${kv('Selling costs / transfer tax', `${pct(v.sell, 0)} / $${z(v.excise).toFixed(2)} per $1,000`)}
+        </table>
+      </td>
+    </tr></table>
+
+    ${v.notes ? `<div class="keep"><h2>Notes</h2><div class="notebox">${esc(v.notes).replace(/\n/g, '<br>')}</div></div>` : ''}
+
+    <div class="foot">${notes.length ? '<b>Data sources:</b> ' + notes.map(esc).join('; ') + '<br>' : ''}
+      Estimates for screening only. Loan rules, limits, tax rates and rents change; confirm with a lender and local sources. Not financial or lending advice.
+      Prepared with the Deal Analyzer by ${esc(BRAND.name)}, ${esc(BRAND.company)}.</div>
+  </div>`;
+}
+
+function pipelineRow(){
+  const { v, P, R, B } = LAST, [f, c, d] = R;
+  const best = R.filter(r => r.irr !== null).sort((a, b) => b.irr - a.irr)[0];
+  return { address: v.address || 'Untitled', units: P.units, price: P.price, gross: P.gross, market: P.market,
+    noi: Math.round(P.noiFull), cap: P.cap, fhaCash: Math.round(f.totalCash), fhaCF: Math.round(f.cfFull),
+    convCash: Math.round(c.totalCash), convCF: Math.round(c.cfFull), dscrCash: Math.round(d.totalCash), dscrCF: Math.round(d.cfFull),
+    dscrCheck: d.check, bestIrr: best ? best.irr : '', bestLoan: best ? best.name : '', brrrrLeft: Math.round(B.left), notes: v.notes || '' };
+}
+
+/* ---------------- Server calls ---------------- */
+function call(fn, ...args){
+  if (fn === 'getFmr') return service('fmr', { query: args[0], state: args[1] });
+  if (fn === 'getTaxRates') return service('taxRates', {});
+  return Promise.reject(new Error('Not available in this version.'));
+}
+/** Calls the Apps Script Data service. text/plain avoids a CORS preflight, which Apps Script can't answer. */
+async function service(action, payload){
+  const key = 'da:' + action + ':' + JSON.stringify(payload);
+  try { const hit = sessionStorage.getItem(key); if (hit) return JSON.parse(hit); } catch (e) {}
+  let res;
+  try {
+    res = await fetch(DATA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ secret: DATA_KEY, action }, payload)) });
+  } catch (e) { throw new Error('Could not reach the data service. Check your connection and try again.'); }
+  let out;
+  try { out = await res.json(); } catch (e) { throw new Error('The data service did not respond. Try again shortly.'); }
+  if (!out.ok && !out.needTown) throw new Error(out.error || 'Data service error.');
+  if (out.ok) { try { sessionStorage.setItem(key, JSON.stringify(out)); } catch (e) {} }
+  return out;
+}
+function toast(msg, err){
+  const t = $('toast'); t.innerHTML = msg; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 6000);
+}
+function fileName(){ return 'Deal summary - ' + (LAST.v.address || 'Untitled') + ' - ' + new Date().toISOString().slice(0, 10); }
+
+const ADDR_MSG = 'Add an address to save or export this deal.';
+function addressOk(){ return $('address').value.replace(/\s/g, '').length >= 3; }
+function requireAddress(){
+  const el = $('address');
+  if (addressOk()) return true;
+  const d = el.closest('details'); if (d) d.open = true;
+  el.classList.add('invalid'); el.setAttribute('aria-invalid', 'true');
+  let msg = $('addrErr');
+  if (!msg) {
+    msg = document.createElement('p'); msg.id = 'addrErr'; msg.className = 'fielderr'; msg.setAttribute('role', 'alert');
+    el.insertAdjacentElement('afterend', msg); el.setAttribute('aria-describedby', 'addrErr');
+  }
+  msg.textContent = ADDR_MSG;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.focus({ preventScroll: true });
+  return false;
+}
+function clearAddressError(){
+  const el = $('address'), msg = $('addrErr');
+  if (!addressOk()) return;
+  el.classList.remove('invalid'); el.removeAttribute('aria-invalid');
+  if (msg) msg.textContent = '';
+}
+
+const STORE_KEY = 'da-deals';
+function readStore(){ try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch (e) { return []; } }
+function save(){
+  if (!LAST) return;
+  if (!requireAddress()) return;
+  const list = readStore();
+  list.unshift({ date: new Date().toLocaleDateString('en-US'), address: LAST.v.address || 'Untitled', inputs: JSON.stringify(rawInputs()) });
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list.slice(0, 50))); }
+  catch (e) { toast('Could not save in this browser (private browsing can block saving).', true); return; }
+  toast('Saved in this browser. Reopen it from "Load a saved deal" or "Compare saved deals".');
+  loadList();
+}
+function downloadPdf(btn, label, html, name){
+  if (!LAST) return;
+  if (!requireAddress()) return;
+  const old = document.getElementById('printFrame'); if (old) old.remove();
+  const f = document.createElement('iframe'); f.id = 'printFrame'; f.setAttribute('aria-hidden', 'true');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d = f.contentWindow.document;
+  d.open();
+  d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(name())}</title><style>@page{size:letter;margin:0.5in}` +
+    `body{margin:0;font-family:Arial,sans-serif;color:#17324D;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${html()}</body></html>`);
+  d.close();
+  setTimeout(() => {
+    try { f.contentWindow.focus(); f.contentWindow.print(); }
+    catch (e) { toast('Could not open the print dialog. Try another browser.', true); }
+  }, 300);
+}
+const download = () => downloadPdf($('pdfBtn'), 'Download PDF', summaryHtml, fileName);
+const downloadCheat = () => downloadPdf($('cheatBtn'), 'Client cheat sheet (PDF)', cheatHtml,
+  () => 'Client cheat sheet - ' + (LAST.v.address || 'Untitled') + ' - ' + new Date().toISOString().slice(0, 10));
+
+/** One-page, plain-English summary for clients without a real estate background. */
+function cheatHtml(){
+  const { v, P, R } = LAST;
+  const st = v.pst === 'RI' ? 'Rhode Island' : 'Massachusetts';
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const ok = R.filter(r => r.ok), best = (ok.length ? ok : R).slice().sort((a, b) => b.cfFull - a.cfFull)[0];
+  const units = [1, 2, 3, 4].filter(n => z(v['r' + n + 'c']) > 0);
+  const beds = n => ({ 0: 'Studio', 1: '1 bedroom', 2: '2 bedrooms', 3: '3 bedrooms', 4: '4+ bedrooms' })[v['b' + n]] || '';
+  const perUnit = best.cfFull / Math.max(1, P.units);
+  const [label, say, cls] = !best.ok ? ['Doesn\'t qualify', 'None of the three loans fits this deal as entered.', 'neg']
+    : perUnit >= 200 ? ['Strong', 'Rent comfortably covers every monthly cost, with room to spare.', 'pos']
+    : perUnit >= 0 ? ['Workable', 'Rent covers every monthly cost, with a small cushion.', 'pos']
+    : perUnit >= -100 ? ['Tight', 'Rent comes up a little short of the monthly costs.', 'neg']
+    : ['Doesn\'t pay for itself', 'Rent falls well short of the monthly costs.', 'neg'];
+  const leftover = best.cfFull >= 0
+    ? `brings in about <b>${usd(best.cfFull)} more</b> than it costs each month`
+    : `costs about <b>${usd(-best.cfFull)} more</b> each month than it brings in`;
+  const vacancy = P.gross * z(v.vac);
+  const upkeep = P.gross * (1 - z(v.vac)) * P.pct, utilities = P.fixedM - z(v.tax) / 12 - z(v.ins) / 12;
+  const who = { fha: 'For buyers who will live in one unit. Smallest down payment; has monthly mortgage insurance.',
+    conv: 'For buyers who will live in one unit. Low down payment; mortgage insurance drops off over time.',
+    dscr: 'For investors who won\'t live there. Larger down payment; qualifies on the property\'s rent.' };
+  const signed = n => `<span class="${n < 0 ? 'neg' : 'pos'}">${n < 0 ? '−' : '+'}${usd(Math.abs(n))}</span>`;
+  const line = (l, x, cls = '') => `<tr class="${cls}"><td class="lbl">${l}</td><td class="num">${x}</td></tr>`;
+  return `<style>${PDF_CSS}</style>
+  <div class="pdf">
+    <table class="band"><tr>
+      <td class="bandrule"><div class="kicker">CLIENT CHEAT SHEET</div>
+        <div class="addr">${esc(v.address || 'Untitled property')}</div>
+        <div class="sub">${st} &nbsp;|&nbsp; ${P.units} unit${P.units === 1 ? '' : 's'} &nbsp;|&nbsp; Asking ${usd(P.price)} &nbsp;|&nbsp; Prepared ${date}</div></td>
+      <td class="brand bandrule"><b>${esc(BRAND.name)}</b><br>${esc(BRAND.company)}${BRAND.email ? '<br>' + esc(BRAND.email) : ''}</td>
+    </tr></table>
+
+    <h2>The bottom line</h2>
+    <table class="verdict"><tr><td bgcolor="#F2F5F8">
+      <span class="rating ${cls}">${label}</span>
+      <div class="say">With a <b>${esc(best.name)}</b> loan and every unit rented, this property ${leftover}. ${say}</div>
+      ${best.housing !== null && best.occ ? `<div class="note">If you live in one unit, your share of the costs would be about ${usd(Math.max(0, best.housing))} a month in the first year.</div>` : ''}
+    </td></tr></table>
+
+    <table class="two"><tr>
+      <td class="col">
+        <h2>The property</h2>
+        <table>
+          <tr><th>Unit</th><th>Size</th><th>Monthly rent</th></tr>
+          ${units.map(n => `<tr><td class="lbl">Unit ${n}</td><td class="num">${beds(n)}</td><td class="num">${usd(v['r' + n + 'c'])}</td></tr>`).join('')}
+          ${z(v.other) ? `<tr><td class="lbl">Other income</td><td></td><td class="num">${usd(v.other)}</td></tr>` : ''}
+          <tr class="total"><td>Total rent</td><td></td><td class="num">${usd(P.gross)}</td></tr>
+        </table>
+        <h2>Cash needed to buy</h2>
+        <table>
+          ${line('Down payment (' + pct(best.dp, best.dp < 0.05 ? 1 : 0) + ')', usd(P.price * best.dp))}
+          ${line('Closing costs and lender fees', usd(best.cc.total + best.points - best.credit))}
+          ${line('Savings the lender wants you to keep', usd(best.reserves))}
+          ${line('Total cash to have ready', usd(best.totalCash), 'total')}
+        </table>
+        <div class="note">Based on the ${esc(best.name)} loan. Savings stay in your account after closing.</div>
+      </td>
+      <td class="col">
+        <h2>Money in vs. money out (each month)</h2>
+        <table>
+          ${line('Rent collected', signed(P.gross))}
+          ${line('Set aside for empty units', signed(-vacancy))}
+          ${line('Mortgage payment', signed(-best.debtM))}
+          ${line('Property taxes', signed(-best.taxM))}
+          ${line('Home insurance', signed(-best.insM))}
+          ${line('Repairs and upkeep set-aside', signed(-upkeep))}
+          ${utilities > 0.5 ? line('Utilities and other costs you pay', signed(-utilities)) : ''}
+          ${line('Left over each month', signed(best.cfFull), 'total')}
+        </table>
+        <div class="note">Mortgage payment includes mortgage insurance where required.${TAX_FROM_PRICE ? ' Property taxes are estimated from the price; the actual bill is often lower.' : ''}</div>
+      </td>
+    </tr></table>
+
+    <h2>Your loan options</h2>
+    <table>
+      <tr><th>Loan</th><th style="text-align:left">Who it's for</th><th>Cash to have ready</th><th>Monthly payment*</th><th>Left over / month</th></tr>
+      ${R.map(r => `<tr><td><b>${esc(r.name)}</b>${r.key === best.key ? '<div class="tag">BEST FIT</div>' : ''}${r.ok ? '' : '<div class="note"><span class="neg">Doesn\'t qualify as entered</span></div>'}</td>
+        <td class="lbl">${who[r.key]}</td><td class="num">${usd(r.totalCash)}</td><td class="num">${usd(r.piti)}</td><td class="num">${signed(r.cfFull)}</td></tr>`).join('')}
+    </table>
+    <div class="note">*Mortgage, mortgage insurance, property taxes and home insurance together.</div>
+
+    <div class="foot">These are estimates to help you understand the deal, not a loan offer or financial advice. Rates, taxes, insurance and rents
+      change; a lender will confirm the final numbers. Questions? Contact ${esc(BRAND.name)}${BRAND.email ? ' at ' + esc(BRAND.email) : ''}.<br>
+      Prepared with the Deal Analyzer by ${esc(BRAND.name)}, ${esc(BRAND.company)}.</div>
+  </div>`;
+}
+
+let DEALS = [];
+const DEAL_LABEL_MAX = 44;   // keeps the open list no wider than the button
+/** Address only (no date), shortened to fit; repeat saves of the same address get a version number. */
+function dealLabel(d, i){
+  const addr = String(d.address || 'Untitled').trim();
+  const same = DEALS.filter(x => String(x.address || 'Untitled').trim() === addr);
+  const n = same.length > 1 ? same.length - same.indexOf(d) : 0;          // newest save = highest number
+  const suffix = n ? ` (v${n})` : '';
+  const room = DEAL_LABEL_MAX - suffix.length;
+  return (addr.length > room ? addr.slice(0, room - 1).trimEnd() + '…' : addr) + suffix;
+}
+async function loadList(){
+  try {
+    DEALS = readStore();
+    $('loadSel').innerHTML = '<option value="">Load a saved deal…</option>' +
+      DEALS.map((d, i) => `<option value="${i}" title="${esc(d.address)}">${esc(dealLabel(d, i))}</option>`).join('');
+    if (!$('cmpPanel').classList.contains('hidden')) renderPicks();
+  } catch (e) {}
+}
+
+async function openApp(){
+  $('app').classList.remove('hidden');
+  buildForm(); recalc(); loadList(); loadTaxRates();
+}
+
+/* ---------------- Light / dark toggle ---------------- */
+const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function currentTheme(){
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'light' || t === 'dark') return t;
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function paintThemeBtn(){
+  const dark = currentTheme() === 'dark', b = $('themeBtn');
+  b.innerHTML = (dark ? SUN : MOON) + `<span>${dark ? 'Light mode' : 'Dark mode'}</span>`;
+  b.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+}
+function toggleTheme(){
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('da-theme', next); } catch (e) {}
+  paintThemeBtn();
+}
+
+async function init(){
+  paintThemeBtn(); $('themeBtn').onclick = toggleTheme;
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintThemeBtn);
+  $('cmpMore').onclick = () => { CMP_OPEN = !CMP_OPEN; syncCmpMore(document.querySelectorAll('#cmp .more-row:not(.grp)').length); };
+  $('h5buy').innerHTML = term('Rate buydown', 'Rate buydown');
+  $('h5sens').innerHTML = term('priceSens', 'If the price were…');
+  $('saveBtn').onclick = save; $('pdfBtn').onclick = download; $('cheatBtn').onclick = downloadCheat;
+  $('step').oninput = renderTools;
+  $('toolSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    TOOL = b.dataset.k;
+    $('toolSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    renderTools();
+  });
+  $('cmpBtn').onclick = () => {
+    const p = $('cmpPanel'); p.classList.toggle('hidden');
+    if (!p.classList.contains('hidden')) { renderPicks(); p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  };
+  $('loadSel').onchange = e => {
+    const d = DEALS[e.target.value]; if (!d) return;
+    try { writeInputs(JSON.parse(d.inputs)); toast('Loaded ' + esc(d.address)); } catch (err) { toast('That saved deal could not be read.', true); }
+    e.target.value = '';
+  };
+  $('fbBtn').href = FEEDBACK_URL || ('mailto:' + BRAND.email + '?subject=' + encodeURIComponent('Deal Analyzer feedback'));
+  if (!FEEDBACK_URL) $('fbBtn').removeAttribute('target');
+  openApp();
+}
+init();
+</script>
+</body>
+</html>
