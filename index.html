@@ -289,6 +289,7 @@ const GLOSS = {
   notes: ['Your notes', 'Private notes about this deal: what you saw, questions for the seller, next steps. They save with the deal, print on the PDF and show when you compare saved deals.'],
   pst: ['Property state', 'Sets the state for HUD town rents, the tax estimator, recording fees and the transfer tax on sale.'],
   assessed: ['Assessed value', 'The town\'s taxable value for this property, listed on the assessor\'s website. It\'s often well below the price, and it\'s what taxes are based on. If you leave it blank, the estimate uses the price and will likely overstate taxes.'],
+  ownYrs: ['Years you\'ll live there', 'How long you plan to live in the property on an FHA or Conventional loan (lenders expect at least 1 year). Your unit\'s rent and the owner-occupant tax break apply for these years; after that, every unit is rented.'],
   exSave: ['Owner-occupant tax savings', 'Yearly tax break for living in the property (MA residential exemption or RI homestead). It stops when you move out.'],
   vac: ['Vacancy & credit loss', 'Rent lost to empty units and unpaid rent. 5% is about 2–3 weeks a year per unit.'],
   rm: ['Repairs', 'Everyday fixes and maintenance, as a share of rent collected.'],
@@ -409,11 +410,12 @@ const SECTIONS = [
   ["Rents (monthly)", true, [
     ["hud", "", "", "hudblock", "full"],
     ["units", "", "", "unitgrid", "full"],
-    ["other", "Other income", 0, "$"], ["owner", "Unit you'd live in", "1", "sel", "", [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["0", "None (investment only)"]]]]],
+    ["other", "Other income", 0, "$"], ["owner", "Unit you'd live in", "1", "sel", "", [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["0", "None (investment only)"]]],
+    ["ownYrs", "Years you'll live there", 1, "yr"]]],
   ["Expenses", false, [
     ["town", "Town (tax estimate)", "", "sel", "full", [["", "Loading towns…"]]], ["assessed", "Assessed value (from the town assessor)", "", "$", "full"],
     ["taxBtn", "Estimate taxes from town", "", "btn", "full"], ["taxOut", "", "", "note"],
-    ["tax", "Property taxes / yr", 15050, "$"], ["exSave", "Owner-occupant tax savings / yr", 0, "$"],
+    ["tax", "Property taxes / yr", "", "$"], ["exSave", "Owner-occupant tax savings / yr", 0, "$"],
     ["ins", "Insurance / yr", 3762.5, "$"], ["water", "Water / mo", 150, "$"], ["snow", "Snow / mo", 50, "$"],
     ["elec", "Common electric / mo", 150, "$"], ["garb", "Trash / mo", 0, "$"], ["lawn", "Lawn / mo (7 mo)", 0, "$"], ["resv", "Reserves / mo", 0, "$"],
     ["vac", "Vacancy", 5, "%"], ["rm", "Repairs", 5, "%"], ["capex", "CapEx", 5, "%"], ["mgmt", "Management", 0, "%"]]],
@@ -444,7 +446,7 @@ function unitGrid(){
       <select id="b${n}" aria-label="Unit ${n} bedrooms">${BEDS.map(([v, t]) => `<option value="${v}" ${v === '2' ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <div class="unit"><input id="r${n}c" type="number" inputmode="decimal" step="any" value="${cur[n - 1]}" aria-label="Unit ${n} current rent"><span>$</span></div>
       <div class="unit mkt"><input id="r${n}m" type="number" inputmode="decimal" step="any" value="" placeholder="Same" aria-label="Unit ${n} market rent"><span>$</span></div>
-      <div class="ownnote" id="ownnote${n}" hidden><b>You live here.</b> This rent isn't counted in year 1 for FHA and Conventional. It still counts for all-units-rented figures and DSCR.</div>`;
+      <div class="ownnote" id="ownnote${n}" hidden><b>You live here.</b> This rent isn't counted while you live there on FHA and Conventional. It still counts for all-units-rented figures and DSCR.</div>`;
   });
   return h + `</div><div class="full"><button type="button" class="inline-btn" id="mktToggle">Enter market rents manually</button></div>`;
 }
@@ -493,7 +495,7 @@ function onStateChange(){
   });
   fillTownList(''); $('taxOut').textContent = ''; $('hudOut').innerHTML = '';
   TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = ''; $('assessed').classList.remove('needs');
-  PST_PREV = now; recalc();
+  PST_PREV = now; taxPrompt(); recalc();
 }
 const NOTES_MAX = 2000;
 let MKT_ON = false, CMP_OPEN = false, CMP_AUTO = false;
@@ -514,6 +516,7 @@ function syncMarket(){
 /** Marks the unit you'd live in: dims its rent (kept as entered) and shows a short explanation. */
 function syncOwner(){
   const own = Number(($('owner') && $('owner').value) || 0);
+  const yrs = $('ownYrs'); if (yrs) yrs.closest('div.unit').parentElement.style.display = own ? '' : 'none';
   [1, 2, 3, 4].forEach(n => {
     const on = n === own, row = $('r' + n + 'c'), note = $('ownnote' + n);
     if (!row || !note) return;
@@ -574,9 +577,18 @@ function buildForm(){
   $('assessed').addEventListener('change', () => { if (TAX_EST_DONE && $('town').value) taxEstimate(); });
   $('tax').addEventListener('input', e => {        // investor typed their own tax bill
     if (!e.isTrusted) return;
+    const hadEst = TAX_EST_DONE;
     TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = '';
-    $('assessed').classList.remove('needs'); $('taxOut').textContent = '';
+    $('assessed').classList.remove('needs');
+    // The town estimate's owner-occupant savings no longer match a hand-entered bill
+    if (hadEst && z(Number($('exSave').value))) {
+      $('exSave').value = 0;
+      $('taxOut').textContent = 'Owner-occupant savings reset to $0. If your bill qualifies for an exemption, enter the yearly savings below.';
+    } else $('taxOut').textContent = '';
   });
+  // Rents decide 1-unit vs multi-unit tax rates, so refresh an estimate when they change
+  [1, 2, 3, 4].forEach(n => $('r' + n + 'c').addEventListener('change', () => { if (TAX_EST_DONE && $('town').value) taxEstimate(); }));
+  taxPrompt();
   PST_PREV = $('pst').value;
   $('pst').addEventListener('change', onStateChange);
 }
@@ -609,7 +621,7 @@ function writeInputs(raw){
   MKT_ON = false; syncMarket();
   PST_PREV = $('pst').value; fillTownList(raw.town || ''); updateNotesCount(); syncOwner();
   TAX_FROM_PRICE = false; TAX_EST_DONE = false; NOTES.tax = ''; $('taxOut').textContent = ''; $('assessed').classList.remove('needs');
-  recalc();
+  taxPrompt(); recalc();
 }
 
 /* ---------------- Finance math ---------------- */
@@ -641,13 +653,13 @@ function property(v){
 }
 
 /** Closing costs & prepaids for a given loan. */
-function closing(v, P, loan, annualRate){
+function closing(v, P, loan, annualRate, taxYr = z(v.tax)){
   if (v.ccMode !== 'ma') return { total: P.price * z(v.ccPct), items: null };
   const items = [
     ['Attorneys (buyer + lender)', z(v.attyFees)], ['Recording (deed + mortgage)', loan > 0 ? z(v.recording) : 155],
     ["Lender's title insurance", loan * z(v.lenderTitle)], ["Owner's title insurance", P.price * z(v.ownerTitle)],
     ['Appraisal', loan > 0 ? z(v.appraisal) : 0], ['Home inspection', z(v.inspect)], ['Lender fees', loan > 0 ? z(v.lenderFees) : 0],
-    ['Other fees', z(v.otherFees)], ['Escrow deposit: taxes', z(v.tax) / 12 * z(v.escrowTaxMo)],
+    ['Other fees', z(v.otherFees)], ['Escrow deposit: taxes', taxYr / 12 * z(v.escrowTaxMo)],
     ['Escrow deposit: insurance', z(v.ins) / 12 * z(v.escrowInsMo)],
     ['First-year insurance premium', z(v.ins) / 12 * z(v.insMo)], ['Prepaid interest', loan * annualRate / 365 * z(v.prepaidDays)]];
   return { total: items.reduce((s, [, x]) => s + x, 0), items };
@@ -668,7 +680,10 @@ function scenario(v, P, key){
   const thresh = v.fhaThresh > 0 ? v.fhaThresh : 726200, highLtv = dp < 0.05;
   const miRate = key === 'fha' ? (base > thresh ? (highLtv ? 0.0075 : 0.0070) : (highLtv ? 0.0055 : 0.0050))
     : (key === 'conv' && dp < 0.2 ? z(v.conv_mi) : 0);
-  const cc = closing(v, P, loan, annual);
+  // Owner-occupant tax break applies only while the owner lives there (FHA / Conventional)
+  const exSave = S.occ ? Math.min(z(v.exSave), z(v.tax)) : 0;
+  const ownYrs = S.occ ? Math.max(1, Math.round(z(v.ownYrs) || 1)) : 0;
+  const cc = closing(v, P, loan, annual, z(v.tax) - exSave);   // escrow collects the bill you'll actually pay
   const credit = Math.max(0, Math.min(z(v.credit), S.capPct * price, cc.total + points));
   const cashClose = price * dp + cc.total + z(v.rehab) + points - credit;
   // FHA: annual MIP = rate x average scheduled balance of the BASE loan (no upfront premium) for that year.
@@ -678,7 +693,6 @@ function scenario(v, P, key){
   const miAnnual = y => key === 'fha' ? miRate * avgBase(y) : loan * miRate;
   const miM = miRate ? miAnnual(1) / 12 : 0, debtM = pi + miM;
   const piti = pi + miM + z(v.tax) / 12 + z(v.ins) / 12;
-  const exSave = S.occ ? z(v.exSave) : 0;
 
   let miYears = 0;
   if (miM > 0) {
@@ -709,9 +723,9 @@ function scenario(v, P, key){
   const N = Math.max(1, Math.min(30, Math.round(z(v.hold) || 10)));
   const flows = [-cashClose]; let cum = 0;
   for (let y = 1; y <= N; y++) {
-    const owned = S.occ && y <= 1;
+    const owned = S.occ && y <= ownYrs, grow = Math.pow(1 + z(v.eg), y - 1);
     const g = (P.gross - (owned ? P.ownRent : 0)) * 12 * Math.pow(1 + z(v.rg), y - 1);
-    const egi = g * (1 - z(v.vac)), opex = P.fixedM * 12 * Math.pow(1 + z(v.eg), y - 1) + egi * P.pct - (owned ? exSave : 0);
+    const egi = g * (1 - z(v.vac)), opex = P.fixedM * 12 * grow + egi * P.pct - (owned ? exSave * grow : 0);
     const cf = egi - opex - pi * 12 - (y <= miYears ? miAnnual(y) : 0);
     cum += cf; flows.push(cf);
   }
@@ -806,9 +820,10 @@ function recalc(){
 
   const best = R.filter(r => r.ok).sort((a, b) => b.cfFull - a.cfFull)[0] || R.slice().sort((a, b) => b.cfFull - a.cfFull)[0];
   const maxOffer = Math.max(...R.map(r => r.maxCF || 0));
-  $('verdict').textContent = best.cfFull >= z(v.tcf)
+  $('verdict').textContent = (best.cfFull >= z(v.tcf)
     ? `${best.name} works best here: ${usd(best.cfFull)} a month once every unit is rented.`
-    : `At ${usd(P.price)}, no loan hits your cash flow target. The highest offer that does is about ${usd(maxOffer)}.`;
+    : `At ${usd(P.price)}, no loan hits your cash flow target. The highest offer that does is about ${usd(maxOffer)}.`)
+    + (z(v.tax) > 0 ? '' : ' Property taxes aren\'t entered yet, so these numbers are too optimistic.');
 
   $('strip').innerHTML = R.map(r => `<div class="loan">
       <h3>${r.name}</h3><div class="sub">${pct(r.dp)} down, ${usd(r.loan)} loan</div>
@@ -955,6 +970,11 @@ function fillTownList(keep){
   sel.value = towns.includes(want) ? want : '';
 }
 
+/** Nudge when no tax bill is entered (the field starts blank on purpose). */
+function taxPrompt(){
+  if (!(Number($('tax').value) > 0) && !TAX_EST_DONE)
+    $('taxOut').textContent = 'No property tax entered yet. Pick the town and click Estimate, or type the tax bill below.';
+}
 function taxEstimate(){
   const out = $('taxOut'), name = $('town').value.trim().toLowerCase(), st = $('pst').value || 'MA';
   const stName = st === 'RI' ? 'Rhode Island' : 'Massachusetts';
@@ -963,8 +983,8 @@ function taxEstimate(){
   if (!t) { out.textContent = name ? `Pick a ${stName} town from the list.` : 'Choose a town first.'; return; }
   const fromPrice = !(Number($('assessed').value) > 0);
   const assessed = fromPrice ? (Number($('price').value) || 0) : Number($('assessed').value);
-  const units = [1, 2, 3, 4].filter(n => Number($('r' + n + 'c').value) > 0).length || 1;
-  const one = units === 1;
+  const units = [1, 2, 3, 4].filter(n => Number($('r' + n + 'c').value) > 0).length;
+  const one = units === 1;            // no rents yet → standard (multi-unit) rate, refreshed once rents are entered
   const nonRate = (one && t.rate1) || t.rate;
   const ownRate = (one && (t.ownerRate1 || t.ownerRate)) || t.ownerRate || nonRate;
   const tax = Math.round(assessed * nonRate / 1000);
